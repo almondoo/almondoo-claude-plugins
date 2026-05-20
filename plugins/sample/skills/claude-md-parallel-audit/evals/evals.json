@@ -1,0 +1,23 @@
+{
+  "skill_name": "claude-md-parallel-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "~/.claude/CLAUDE.md を独立検証として audit したい。9 subagent 並列で精読させて、HIGH severity の抜け漏れ・不整合を ≥4/9 で再現するものだけ修正対象として扱ってほしい。意図的設計の除外: 'English Feedback' セクションの不在、'1-horsepower cap' の比喩、find/grep の harness allow vs CLAUDE.md prohibition の dual-layer 設計、L102 vs L93/L103 の Tier 3 dual management (architectural tension として受容済)。",
+      "expected_output": "Phase 1 で除外を AskUserQuestion で確認、Phase 2 で 9 subagent を並列 dispatch、Phase 3 で per-instance HIGH count + convergent issues の 2 表を提示、Phase 4 で fix candidates と既知 tension を分離、Phase 5 で fix proposal を 1 件ずつ AskUserQuestion、convergence まで iterate。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "うちの project の CLAUDE.md (`/Users/tm/development/oss/review-agent/CLAUDE.md`) が長くなってきて、section 間で矛盾している気がする。3 instance × ≥2/3 で軽めに audit して、structural な問題があれば指摘してほしい。",
+      "expected_output": "Phase 1 で N=3, threshold=2 を確認、target_file を project CLAUDE.md と確定、exclusions を user に聞く、Phase 2-4 を 3 instance で実施、convergent issues を提示、必要なら fix proposal、最大 5 iteration 以内に convergence。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "global CLAUDE.md と project CLAUDE.md と CLAUDE.local.md が交錯していて、どこに何が書いてあるか整合性を取りたい。global CLAUDE.md だけを対象に multi-agent audit してほしい。default 設定でよい。除外は『過去 audit で受容済の architectural tensions』全般。",
+      "expected_output": "Phase 1 で target_file=~/.claude/CLAUDE.md、N=9 / threshold=4 / max_iter=5 を確認、exclusions が曖昧なので user に具体例を listing で出してもらうよう follow-up AskUserQuestion、その後 Phase 2 以降を標準フローで実行。",
+      "files": []
+    }
+  ]
+}
