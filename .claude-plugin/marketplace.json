@@ -1,0 +1,12 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "almondoo-claude-plugins",
+  "description": "Claude Code plugin marketplace published by almondoo.",
+  "owner": {
+    "name": "almondoo"
+  },
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": []
+}
