@@ -1,0 +1,12 @@
+{
+  "name": "sample",
+  "description": "Minimal sample plugin with a single `hello` skill. Use as a starter template when adding new plugins to this marketplace.",
+  "version": "0.1.0",
+  "author": {
+    "name": "almondoo"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/almondoo/almondoo-claude-plugins",
+  "homepage": "https://github.com/almondoo/almondoo-claude-plugins/tree/main/plugins/sample",
+  "keywords": ["sample", "template", "example"]
+}

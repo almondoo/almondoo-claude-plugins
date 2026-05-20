@@ -8,5 +8,14 @@
   "metadata": {
     "pluginRoot": "./plugins"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "sample",
+      "description": "Minimal sample plugin with a single `hello` skill. Use as a starter template when adding new plugins to this marketplace.",
+      "source": "./plugins/sample",
+      "version": "0.1.0",
+      "category": "learning",
+      "keywords": ["sample", "template", "example"]
+    }
+  ]
 }
