@@ -16,6 +16,14 @@
       "version": "0.1.0",
       "category": "learning",
       "keywords": ["sample", "template", "example"]
+    },
+    {
+      "name": "claude-md-parallel-audit",
+      "description": "Multi-agent parallel audit of CLAUDE.md and similar agent-instruction files. Dispatches N independent subagents, aggregates findings by reproducibility (≥4/9 default), and proposes targeted fixes.",
+      "source": "./plugins/claude-md-parallel-audit",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": ["claude-md", "audit", "multi-agent", "parallel", "review"]
     }
   ]
 }
