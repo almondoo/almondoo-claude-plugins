@@ -84,7 +84,7 @@ def render(static: dict, benchmark: Optional[dict], target: str) -> str:
         f"# skill-eval report: {target}",
         "",
         "## Verdict",
-        "<one-line judgment — choose exactly one: Ship-ready / Needs work / Net negative / Inconclusive>",
+        "<one-line judgment — choose exactly one of: Ship-ready / Needs work / Net negative. Optionally append `+ Inconclusive (high variance)` or `+ single-run, variance not measured` as an additive flag.>",
         "",
     ]
     lines += render_static(static)

@@ -46,7 +46,7 @@ Ask via AskUserQuestion (do not ask through plain text output).
 [Step 6] write a unified report.md combining static + dynamic
 ```
 
-The workspace lives alongside `target_skill_path` as `<skill-name>-eval-workspace/iteration-N/`. The layout mirrors skill-creator's so that the workspace can later be carried into skill-creator for further iteration.
+The workspace lives in the **parent directory of `target_skill_path`** as `<skill-name>-eval-workspace/`, where `<skill-name>` is the directory basename of `target_skill_path`. Each run creates a fresh `iteration-N/` subdirectory under the workspace; `N` starts at `1` on first run and increments by `1` for each subsequent run (determined by listing existing `iteration-*` subdirectories and taking the highest N + 1). All Step 1–6 commands in this skill use `<workspace>` to refer to `<skill-name>-eval-workspace/` (the parent of the iteration dirs). The layout mirrors skill-creator's so that the workspace can later be carried into skill-creator for further iteration.
 
 ---
 
@@ -93,7 +93,7 @@ Axes (1:1 with the implementation; see `references/eval-axes.md` for details):
 }
 ```
 
-If `hard_fail: true`, do not run the dynamic layer — prompt the user to fix instead.
+If `hard_fail: true`, surface the structural blocker via AskUserQuestion before continuing: present the failing axis evidence and ask whether to (a) fix the blocker first and re-run, (b) skip the dynamic layer and proceed to Step 6 static-only report, or (c) attempt the dynamic layer anyway (advanced — produces likely-meaningless benchmark). Default option (a). The user's `skip dynamic?` input from Step 4 of Inputs is honored as (b) without re-asking if already set.
 
 ---
 
@@ -178,13 +178,13 @@ Runs with no `timing.json` are treated as `null` by the aggregator and excluded 
 ### Dispatch decision criteria
 
 - Verify the target skill is **read-only / safe** by skimming its SKILL.md. Skills that perform external writes (PR creation, email send, etc.) need sandboxing rather than plain subagents — for now, warn the user and offer to skip the dynamic layer.
-- A high prompt-by-configuration count (e.g. 3 × 2 × 3 runs = 18) can blow up parallelism. When `runs_per_configuration > 1`, batch in groups of 6.
+- A high prompt-by-configuration count (e.g. 3 prompts × 2 configurations × 3 runs = 18 subagents) can blow up parallelism. To preserve the L136 "same turn" guarantee, treat **6 total subagents as the soft cap** for one evaluation: if `2 × prompts × runs_per_configuration > 6`, reduce one of the inputs (typically `runs_per_configuration` or the number of eval prompts) at Step 2 confirmation rather than batching across turns. Batching across turns would break L136's cross-eval time-of-day comparability guarantee.
 
 ---
 
 ## Step 4: Grading
 
-Once every run has completed, hand each run's outputs and assertions to `agents/grader.md` (this is a **prompt template without frontmatter** — not a Claude Code agent file). Either Read it into a subagent or paste its contents inline.
+Once every run has completed, hand each run's outputs and assertions to `agents/grader.md` (this is a **prompt template without frontmatter** — not a Claude Code agent file, so it cannot be dispatched as one). Spawn one grader subagent per run and instruct it to **read `agents/grader.md` from `<this-skill-path>/`** before grading; the example below shows the exact prompt shape.
 
 Example grader input:
 
@@ -225,7 +225,15 @@ python3 <this-skill-path>/scripts/aggregate_benchmark.py \
   --out <workspace>/iteration-N/benchmark.json
 ```
 
-The schema of `benchmark.json` is identical to the schema documented in skill-creator's `references/schemas.md` (`runs[]` / `run_summary.with_skill` / `run_summary.without_skill` / `delta`).
+The schema of `benchmark.json` mirrors skill-creator's reference (also documented in `skill-creator/references/schemas.md` for those who have it installed). The load-bearing top-level keys are:
+
+- `metadata` — `{ skill_name, iteration_dir, evals_run[], runs_per_configuration }`
+- `runs[]` — per-run records `{ eval_id, eval_name, configuration ("with_skill"|"without_skill"), run_number, result: { pass_rate, passed, failed, total, time_seconds, tokens, tool_calls, errors }, expectations[] }` (`tool_calls` / `errors` are currently emitted as `0` placeholders but reserved for future instrumentation)
+- `run_summary` — `{ with_skill, without_skill, delta }` each holding `pass_rate` / `time_seconds` / `tokens` stats blocks
+- `differentiating_assertions[]` — assertions where `with_pass_rate − without_pass_rate ≥ 0.5`
+- `notes[]`
+
+The viewer reads the listed keys exactly; do not rename them.
 
 Also emit `benchmark.md` as a human-readable table. The script produces a summary table plus a per-eval breakdown (verbatim from `aggregate_benchmark.py`):
 
@@ -288,12 +296,12 @@ Minimal manual format:
 - static.json / benchmark.json / runs/eval-*/{with_skill,without_skill}/outputs/
 ```
 
-Verdict heuristics (use as guidance only; the user makes the final call):
+Verdict heuristics — evaluate in this order, first match wins (the order resolves boundary overlaps). The user makes the final call:
 
-- **Ship-ready**: static score ≥ 0.8 AND pass_rate delta ≥ +0.2
-- **Needs work**: static score between 0.5 and 0.8, OR pass_rate delta between +0.05 and +0.2
-- **Net negative**: pass_rate delta ≤ 0, OR both time and tokens at least 2× larger
-- **Inconclusive**: runs_per_configuration < 3, OR stddev > mean × 0.3 (the latter is only meaningful once runs_per_configuration ≥ 3)
+- **Net negative**: `pass_rate delta ≤ 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`)
+- **Ship-ready**: `static score ≥ 0.8` AND `pass_rate delta ≥ +0.2`
+- **Needs work**: any case not caught above (covers `static score 0.4–0.8`, `pass_rate delta` in `(0, +0.2)`, etc.)
+- **Inconclusive** (variance flag, additive — does not displace the above): `runs_per_configuration ≥ 3` AND `stddev > mean × 0.3`. When `runs_per_configuration < 3`, append "single-run, variance not measured" to the report but assign the verdict from the first three rules.
 
 ---
 

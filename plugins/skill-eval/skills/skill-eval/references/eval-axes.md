@@ -116,14 +116,16 @@ The only way to know "is this skill helping" is to run the same prompts with and
 
 ## Verdict heuristics
 
-The rationale behind the decision logic mentioned in `SKILL.md`:
+The rationale behind the decision logic mentioned in `SKILL.md`. The verdicts are **evaluated in order, first match wins** — this ordering is load-bearing because it resolves the boundary overlaps that an unordered table would expose (e.g., `static score = 0.8` exactly, or `pass_rate delta = +0.2` exactly). The `Inconclusive` variance flag is **additive** rather than a peer verdict — it annotates the chosen verdict instead of replacing it.
 
-| verdict | condition | intuition |
-|---|---|---|
-| **Ship-ready** | static ≥ 0.8 AND pass_rate delta ≥ +0.2 | structurally sound and empirically helpful |
-| **Needs work** | not the above, but not net-negative | one more round of polish before shipping |
-| **Net negative** | pass_rate delta ≤ 0, or time ≥ 2× AND tokens ≥ 2× | better off without the skill |
-| **Inconclusive** | runs_per_configuration < 3, or stddev > mean × 0.3 | not enough samples / too noisy |
+| order | verdict | condition | intuition |
+|---|---|---|---|
+| 1 | **Net negative** | `pass_rate delta ≤ 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`) | better off without the skill |
+| 2 | **Ship-ready** | `static score ≥ 0.8` AND `pass_rate delta ≥ +0.2` | structurally sound and empirically helpful |
+| 3 | **Needs work** | any case not caught above | one more round of polish before shipping |
+| flag | **Inconclusive** (additive) | `runs_per_configuration ≥ 3` AND `stddev > mean × 0.3` | high variance — verdict from rule 1–3 still applies, but treat with caution |
+
+For `runs_per_configuration < 3`, the variance test is not applicable; report appends "single-run, variance not measured" instead of the Inconclusive flag, and the verdict from rules 1–3 stands.
 
 These are not absolutes. E.g. a `time delta +200s` can still be worth shipping if the pass_rate climbs by +0.6. The user makes the final call.
 
