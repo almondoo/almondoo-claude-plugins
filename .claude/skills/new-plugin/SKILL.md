@@ -6,38 +6,37 @@ disable-model-invocation: true
 
 # new-plugin
 
-このマーケットプレイス (`almondoo-claude-plugins`) に新しいプラグインを追加するときに使う。README に書かれている 3 ステップ (ディレクトリ作成 / `plugin.json` 作成 / `marketplace.json` 登録) を一括で行う。
+Use when adding a new plugin to the `almondoo-claude-plugins` marketplace. Executes the three-step workflow documented in `README.md` (create directory / write `plugin.json` / register in `marketplace.json`) in a single command.
 
-## 使い方
+## How to use
 
-ユーザーから `<plugin-name>` と任意で `<description>` を受け取って、次の順で実行する。プラグイン名は `kebab-case` (英小文字 + 数字 + ハイフンのみ) であることを確認する。
+Take `<plugin-name>` (required) and `<description>` (optional) from the user. Verify `<plugin-name>` is kebab-case (lowercase letters, digits, hyphens) before running.
 
-1. リポジトリルートで scaffold スクリプトを実行する:
+1. From the repository root, run the scaffold script:
 
    ```bash
    ./.claude/skills/new-plugin/scripts/scaffold.sh <plugin-name> "<description>"
    ```
 
-2. 生成・更新されたファイルを `git status` で確認し、ユーザーに次を報告する:
-   - 生成された `plugins/<plugin-name>/` 配下のファイル一覧
-   - `.claude-plugin/marketplace.json` の差分 (新エントリ)
+2. Inspect the result with `git status` and report:
+   - The files generated under `plugins/<plugin-name>/`
+   - The new entry added to `.claude-plugin/marketplace.json`
 
-3. 検証 (`CLAUDE.local.md` の verification ルール):
-   - `jq . .claude-plugin/marketplace.json` でルートの妥当性
-   - `jq . plugins/<plugin-name>/.claude-plugin/plugin.json` で plugin manifest の妥当性
-   - `plugins/<plugin-name>/skills/<plugin-name>/SKILL.md` の frontmatter `name` がディレクトリ名と一致していること
+3. Verify (per the `CLAUDE.local.md` rules):
+   - `jq . .claude-plugin/marketplace.json` — root manifest is valid
+   - `jq . plugins/<plugin-name>/.claude-plugin/plugin.json` — plugin manifest is valid
+   - The frontmatter `name` of `plugins/<plugin-name>/skills/<plugin-name>/SKILL.md` matches its directory name
 
-4. 次のアクションを提示:
-   - SKILL.md の本文を実装する (現状はプレースホルダ)
-   - `plugins/<plugin-name>/README.md` を編集する
-   - 必要なら `marketplace.json` の `category` と `keywords` を埋める (現状はそれぞれ `productivity` と空配列)
+4. Suggest the next actions:
+   - Fill in the body of the generated `SKILL.md` (currently a TODO placeholder)
+   - Edit `plugins/<plugin-name>/README.md`
+   - Adjust `category` and `keywords` in `marketplace.json` if `productivity` / `[]` are not appropriate
 
-## 引数
+## Arguments
 
-- `<plugin-name>` (必須): kebab-case の英小文字 + 数字 + ハイフン
-- `<description>` (任意): `marketplace.json` と `plugin.json` 両方に書き込む 1〜2 文の説明。省略時はプレースホルダが入る
+- `<plugin-name>` (required): kebab-case (lowercase letters, digits, hyphens)
+- `<description>` (optional): one or two sentences written into both `marketplace.json` and `plugin.json`. A TODO placeholder is used if omitted.
 
-## 失敗時の挙動
+## Failure modes
 
-- `plugins/<plugin-name>/` が既に存在する場合は scaffold スクリプトが exit 1 で停止する。上書きはしない
-- `marketplace.json` のパースに失敗した場合は何も書き込まずに終了する
+- The script exits 1 without writing anything if `plugins/<plugin-name>/` already exists, if the plugin name is already registered in `marketplace.json`, or if `marketplace.json` cannot be parsed.

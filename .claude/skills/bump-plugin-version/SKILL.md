@@ -6,33 +6,34 @@ disable-model-invocation: true
 
 # bump-plugin-version
 
-`CLAUDE.local.md` の運用ルール「バージョンを上げる場合は `marketplace.json` のエントリと `plugin.json` の `version` を揃える」を機械化する。
+Mechanizes the `CLAUDE.local.md` rule: when bumping a plugin's version, the entry in `marketplace.json` and the `version` field in `plugin.json` must stay in sync.
 
-## 使い方
+## How to use
 
-ユーザーから `<plugin-name>` と `<new-version>` (semver, 例 `0.2.0`) を受け取って、次を実行する。
+Take `<plugin-name>` and `<new-version>` (semver, e.g. `0.2.0`) from the user, then:
 
-1. リポジトリルートで bump スクリプトを実行する:
+1. From the repository root, run the bump script:
 
    ```bash
    ./.claude/skills/bump-plugin-version/scripts/bump.sh <plugin-name> <new-version>
    ```
 
-2. 生成された差分を `git diff -- .claude-plugin/marketplace.json plugins/<plugin-name>/.claude-plugin/plugin.json` で確認し、`<plugin-name>` の version が 2 箇所とも `<new-version>` に揃ったことを報告する。
+2. Inspect the result with `git diff -- .claude-plugin/marketplace.json plugins/<plugin-name>/.claude-plugin/plugin.json` and report that the version is now `<new-version>` in both files.
 
-3. 検証:
+3. Verify:
    - `jq -e --arg n "<plugin-name>" --arg v "<new-version>" '.plugins[] | select(.name == $n) | .version == $v' .claude-plugin/marketplace.json`
    - `jq -e --arg v "<new-version>" '.version == $v' plugins/<plugin-name>/.claude-plugin/plugin.json`
-   - どちらも `true` を返すこと
+   - Both must return `true`.
 
-## 引数
+## Arguments
 
-- `<plugin-name>` (必須): 既に `marketplace.json` に登録済みのプラグイン名
-- `<new-version>` (必須): semver 形式 `MAJOR.MINOR.PATCH`
+- `<plugin-name>` (required): a plugin already registered in `marketplace.json`
+- `<new-version>` (required): semver `MAJOR.MINOR.PATCH[-pre][+build]`
 
-## 失敗時の挙動
+## Failure modes
 
-- `<plugin-name>` が `marketplace.json` に存在しない → exit 1
-- `plugins/<plugin-name>/.claude-plugin/plugin.json` が存在しない → exit 1
-- `<new-version>` が semver に見えない → exit 1
-- どの失敗ケースでもファイルは書き換えない
+The script exits 1 without writing anything if:
+
+- `<plugin-name>` is not registered in `marketplace.json`
+- `plugins/<plugin-name>/.claude-plugin/plugin.json` does not exist
+- `<new-version>` is not valid semver
