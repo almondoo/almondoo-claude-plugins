@@ -1,43 +1,32 @@
 # claude-md-parallel-audit
 
-Multi-agent parallel audit of CLAUDE.md (or any similar agent-instruction file
-such as `CLAUDE.local.md`, `AGENTS.md`, `GEMINI.md`) for **HIGH-severity**
-quality issues: missing qualifiers, grammar errors, terminology drift,
-cross-section logical contradictions, implicit premises, incomplete
-enumerations, undefined terms.
+CLAUDE.md (および `CLAUDE.local.md` / `AGENTS.md` / `GEMINI.md` などの同種のエージェント指示ファイル) を **複数エージェントで並列に監査** し、**HIGH 重大度** の品質問題を洗い出します。検出対象は、修飾語の欠落・文法ミス・用語ゆれ・セクション間の論理矛盾・暗黙の前提・列挙漏れ・未定義語など。
 
-## How it works
+## 仕組み
 
-1. Dispatch **N independent subagents** (default `N=9`) to audit the same file.
-2. Aggregate findings by **reproducibility** — only issues flagged by **≥ K of N**
-   instances (default `K=4`) are treated as real signal. Findings from a single
-   instance are discarded as noise.
-3. Triage results into:
-   - **New fixable defects** — propose targeted fixes via `AskUserQuestion`.
-   - **Known architectural tensions** the user has already accepted — list separately.
-4. Iterate until convergence (no new HIGH-severity issues reproduced ≥ K times),
-   capped at `max_iter` rounds.
+1. 同じファイルに対して **N 個の独立したサブエージェント** (既定 `N=9`) を投入して監査する。
+2. **再現性** で findings を集約 — **N のうち K 個以上** (既定 `K=4`) で報告された問題のみを真のシグナルとして採用する。単発の検出はノイズとして破棄。
+3. 結果を以下にトリアージする:
+   - **修正可能な新規欠陥** — `AskUserQuestion` で具体的な修正案を提示。
+   - **ユーザーが既に許容している構造的トレードオフ** — 別枠で列挙。
+4. 収束 (K 回以上再現する HIGH 重大度の新規問題が出なくなる) まで反復、上限は `max_iter` ラウンド。
 
-## Install
+## インストール
 
 ```
 /plugin marketplace add almondoo/almondoo-claude-plugins
 /plugin install claude-md-parallel-audit@almondoo-claude-plugins
 ```
 
-## Usage
+## 使い方
 
 ```
 /claude-md-parallel-audit:claude-md-parallel-audit
 ```
 
-The skill auto-activates when the user asks to **audit / review / verify /
-check the quality** of a CLAUDE.md or similar instruction file, or mentions
-*multi-agent audit*, *convergence audit*, *parallel review*, *instruction file
-consistency*, or wants high-confidence reproducibility on defects in a long
-instruction file.
+ユーザーが CLAUDE.md などの指示ファイルについて **監査 / レビュー / 検証 / 品質チェック** を依頼したとき、または *multi-agent audit* / *convergence audit* / *parallel review* / *instruction file consistency* といったキーワードに言及したとき、長い指示ファイルの欠陥に対して高い信頼性のある再現性を求めるときに、スキルが自動起動します。
 
-## Layout
+## レイアウト
 
 ```
 claude-md-parallel-audit/
@@ -45,24 +34,21 @@ claude-md-parallel-audit/
 │   └── plugin.json
 ├── skills/
 │   └── claude-md-parallel-audit/
-│       ├── SKILL.md                       # main skill definition
-│       ├── agents/                        # specialist subagents
+│       ├── SKILL.md                       # メインのスキル定義
+│       ├── agents/                        # 専門サブエージェント
 │       │   ├── auditor.md
 │       │   ├── default-redundancy-checker.md
 │       │   ├── false-positive-detector.md
 │       │   └── fix-safety-checker.md
 │       └── evals/
-│           └── evals.json                 # trigger / behavior tests
+│           └── evals.json                 # トリガー / 振る舞いテスト
 └── README.md
 ```
 
-## Distinction from template-comparison audits
+## テンプレート比較型監査との違い
 
-This skill specifically uses **parallel independent audits + reproducibility
-threshold**, not template matching. It is complementary to (not a replacement
-for) template-comparison audits such as
-`claude-md-management:claude-md-improver` from the official marketplace.
+このスキルは **独立した並列監査 + 再現性しきい値** に特化しており、テンプレートマッチングは行いません。公式マーケットプレイスの `claude-md-management:claude-md-improver` のようなテンプレート比較型監査とは置き換えではなく **補完関係** です。
 
-## License
+## ライセンス
 
 [Apache-2.0](../../LICENSE)

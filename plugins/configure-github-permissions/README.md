@@ -1,67 +1,53 @@
 # configure-github-permissions
 
-Interactively configure `gh` (GitHub CLI) permissions for Claude Code at the
-**per-category × 3-choice** (`allow` / `ask` / `deny`) granularity, writing the
-result into the project's `.claude/settings.local.json`.
+Claude Code 向けの `gh` (GitHub CLI) パーミッションを **カテゴリ別 × 3 択** (`allow` / `ask` / `deny`) の粒度で対話的に設定し、結果をプロジェクトの `.claude/settings.local.json` に書き込みます。
 
-## Why
+## なぜ必要か
 
-Coarse tier presets ("allow read-only, ask the rest") cannot express
-realistic policies like *"auto-allow read-only and PR creation, but always
-deny merge / release / workflow execution because they are irreversible
-external writes."* This skill asks one question per category so each
-operation group lands in the right bucket independently.
+「read-only は allow、それ以外は ask」のような粗いプリセットでは、現実的なポリシー —— たとえば *「read-only と PR 作成は自動許可、merge / release / workflow 実行は不可逆な外部書き込みなので常に拒否」* —— は表現できません。このスキルは 1 カテゴリ 1 質問で尋ね、各操作グループを独立して適切なバケットに振り分けます。
 
-## How it works
+## 仕組み
 
-10 categories × 3 choices, asked across 3 `AskUserQuestion` batches:
+10 カテゴリ × 3 択を、3 回の `AskUserQuestion` バッチに分けて確認します:
 
-| # | Category | Default |
+| # | カテゴリ | 既定値 |
 |---|---|---|
 | 1 | Read-only (`gh ... view/list/status/diff/checks/search`) | `allow` |
-| 2 | Local ops (`gh pr checkout`, `gh browse`) | `allow` |
-| 3 | Comments & reviews (`gh issue/pr comment`, `gh pr review`) | `ask` |
-| 4 | Issue create / edit | `ask` |
-| 5 | Issue close / reopen | `deny` |
-| 6 | PR create / edit / ready | `ask` |
-| 7 | PR merge / close | `deny` |
-| 8 | Release ops (create / edit / upload / delete) | `deny` |
-| 9 | Workflow execution (`workflow run`, `run rerun`, …) | `deny` |
-| 10 | `gh api` low-level | `ask` |
+| 2 | ローカル操作 (`gh pr checkout`, `gh browse`) | `allow` |
+| 3 | コメント・レビュー (`gh issue/pr comment`, `gh pr review`) | `ask` |
+| 4 | Issue 作成・編集 | `ask` |
+| 5 | Issue クローズ・リオープン | `deny` |
+| 6 | PR 作成・編集・ready 化 | `ask` |
+| 7 | PR マージ・クローズ | `deny` |
+| 8 | Release 操作 (create / edit / upload / delete) | `deny` |
+| 9 | Workflow 実行 (`workflow run`, `run rerun`, …) | `deny` |
+| 10 | `gh api` 低レベル | `ask` |
 
-After collecting answers, the skill:
+回答を集めた後、スキルは以下を実行します:
 
-1. Reads existing `permissions.{allow,ask,deny}` in
-   `.claude/settings.local.json` (creates the file with minimal scaffolding
-   if absent).
-2. Computes the additions per array, **dedupes** against existing entries.
-3. Surfaces **cross-array conflicts** (e.g. trying to add to `allow` what
-   already sits in `deny`) and asks how to resolve.
-4. Shows a final preview (target path + per-array new entries) and writes
-   only on explicit confirmation.
+1. `.claude/settings.local.json` の既存の `permissions.{allow,ask,deny}` を読み込む (ファイルが無ければ最小限の雛形で作成)。
+2. 配列ごとの追加分を計算し、既存エントリと **重複排除** する。
+3. **配列間の競合** (例: `deny` にあるものを `allow` に追加しようとする) を検出し、解決方法を確認する。
+4. 最終プレビュー (書き込み先パス + 配列ごとの新規エントリ) を表示し、明示的な確認後にのみ書き込む。
 
-The skill never touches keys other than `permissions.{allow,ask,deny}` and
-preserves existing ordering.
+`permissions.{allow,ask,deny}` 以外のキーには触れず、既存の並び順を保持します。
 
-## Install
+## インストール
 
 ```
 /plugin marketplace add almondoo/almondoo-claude-plugins
 /plugin install configure-github-permissions@almondoo-claude-plugins
 ```
 
-## Usage
+## 使い方
 
 ```
 /configure-github-permissions:configure-github-permissions
 ```
 
-The skill also auto-activates when the user asks to *"set up `gh`
-permissions"*, *"reduce gh prompt frequency"*, *"allowlist GitHub
-commands"*, *"configure per-category permissions for this project"*, or
-mentions setting up an allowlist / permission tier / `gh` deny rules.
+ユーザーが *「gh のパーミッションを設定したい」* / *「gh のプロンプト頻度を減らしたい」* / *「GitHub コマンドを allowlist 化したい」* / *「このプロジェクトのカテゴリ別パーミッションを設定したい」* と依頼したとき、または allowlist / permission tier / `gh` deny ルールのセットアップに言及したときにも、スキルが自動起動します。
 
-## Layout
+## レイアウト
 
 ```
 configure-github-permissions/
@@ -73,21 +59,12 @@ configure-github-permissions/
 └── README.md
 ```
 
-## Design notes
+## 設計メモ
 
-- **Destructive categories default to `deny`.** Merge, release, workflow
-  execution, and `gh api` are irreversible external writes per the user's
-  global Tier-3 policy; the skill must not auto-recommend `allow` for
-  them.
-- **`gh api` is `ask`, not `deny`.** A blanket `deny` would block
-  legitimate GET-only use cases (e.g. PR review inline comments via
-  `gh api repos/{o}/{r}/pulls/{n}/comments`). The skill keeps it as
-  `ask` and notes that path-scoped `allow` rules can be added manually
-  for frequently-hit endpoints.
-- **Conflicts are surfaced, not silently resolved.** If an addition
-  collides with an existing entry in another array, the skill asks
-  before writing — keeping the settings file trustworthy.
+- **破壊的カテゴリは既定 `deny`。** Merge / release / workflow 実行 / `gh api` はユーザーのグローバル Tier-3 ポリシーで不可逆な外部書き込みに該当するため、スキルは `allow` を自動推奨してはならない。
+- **`gh api` は `deny` ではなく `ask`。** 全面 `deny` にすると、PR レビューインラインコメント取得 (`gh api repos/{o}/{r}/pulls/{n}/comments`) のような正当な GET 用途まで塞いでしまう。スキルは `ask` のまま維持し、頻用エンドポイントについてはパススコープ付きの `allow` ルールを手動で追加できることを案内する。
+- **競合は明示し、サイレントには解決しない。** 追加候補が別配列の既存エントリと衝突した場合、スキルは書き込み前に必ず確認を取る —— 設定ファイルの信頼性を保つため。
 
-## License
+## ライセンス
 
 [Apache-2.0](../../LICENSE)

@@ -1,30 +1,30 @@
 # skill-eval
 
-A plugin that **evaluates any Claude Code skill across two layers**.
+任意の Claude Code スキルを **2 層で評価する** プラグイン。
 
-## What it does
+## 何をするか
 
-1. **Static layer** — scores the skill's structure against claude-code plugin conventions.
-   - Frontmatter validity (`name` matches the directory name / `description` includes "when to trigger" cues / length is in range)
-   - SKILL.md body length (~500 lines as a guideline)
-   - Progressive disclosure (use of `references/` / `scripts/` / `assets/`)
-   - Imperative tone / no overuse of `MUST` / `NEVER`
+1. **静的レイヤー (Static)** — スキルの構造を claude-code プラグイン規約に照らしてスコアリング。
+   - frontmatter の妥当性 (`name` がディレクトリ名と一致するか / `description` に「いつトリガーするか」の手がかりが含まれるか / 長さが適正範囲か)
+   - SKILL.md 本文の行数 (目安 500 行以内)
+   - progressive disclosure の活用 (`references/` / `scripts/` / `assets/`)
+   - 命令調のトーン / `MUST` や `NEVER` の濫用がないか
 
-2. **Dynamic layer** — runs **with-skill vs without-skill subagent A/B execution**, the same approach used by skill-creator.
-   - Same test prompts executed in parallel under both configurations
-   - Assertion grading (pass rate)
-   - Time (seconds) / token consumption delta
-   - Aggregated into benchmark.json + benchmark.md
+2. **動的レイヤー (Dynamic)** — **with-skill vs without-skill のサブエージェント A/B 実行** を行う。skill-creator と同じ方式。
+   - 同一テストプロンプトを両構成で並列実行
+   - assertion による採点 (pass rate)
+   - 所要時間 (秒) / トークン消費の差分
+   - `benchmark.json` + `benchmark.md` に集約
 
-## When it triggers
+## トリガー条件
 
-When the user says things like "evaluate this skill" / "benchmark with vs without" / "score this skill's quality" (via Claude's skill auto-trigger). No slash command is provided.
+ユーザーが「このスキルを評価して」「with / without でベンチを取って」「このスキルの品質をスコア化して」などと依頼したとき (Claude のスキル自動トリガー経由) に発動します。スラッシュコマンドは提供しません。
 
-## Prerequisites
+## 前提
 
-- Python 3.10+ (scripts use only the stdlib; PyYAML is used by `parse_frontmatter` when available)
+- Python 3.10+ (スクリプトは標準ライブラリのみで動作。`parse_frontmatter` は PyYAML が利用可能な場合に使用)
 
-## Directory layout
+## ディレクトリ構成
 
 ```
 plugins/skill-eval/
@@ -34,23 +34,23 @@ plugins/skill-eval/
     └── skill-eval/
         ├── SKILL.md
         ├── scripts/
-        │   ├── static_check.py         # structural scoring
-        │   ├── aggregate_benchmark.py  # aggregates with/without results
+        │   ├── static_check.py         # 構造スコアリング
+        │   ├── aggregate_benchmark.py  # with / without 結果の集約
         │   └── render_report.py        # static.json + benchmark.json → report.md
         ├── references/
-        │   └── eval-axes.md            # evaluation axis details
+        │   └── eval-axes.md            # 評価軸の詳細
         ├── agents/
-        │   └── grader.md               # assertion grading prompt template (not a Claude Code agent)
+        │   └── grader.md               # assertion 採点用プロンプトテンプレート (Claude Code agent ではない)
         └── evals/
-            └── evals.json              # test cases for this skill itself
+            └── evals.json              # このスキル自身のテストケース
 ```
 
-## Output example
+## 出力例
 
 ```
-report.md          ... human-readable report
-static.json        ... static scoring result
-benchmark.json     ... with/without aggregation (skill-creator-compatible schema)
+report.md          ... 人間向けレポート
+static.json        ... 静的スコアリング結果
+benchmark.json     ... with / without の集約結果 (skill-creator 互換スキーマ)
 runs/eval-N/
   with_skill/outputs/...
   without_skill/outputs/...
