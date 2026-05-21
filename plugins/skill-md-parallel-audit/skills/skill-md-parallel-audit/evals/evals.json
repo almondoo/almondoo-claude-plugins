@@ -1,0 +1,59 @@
+{
+  "skill_name": "skill-md-parallel-audit",
+  "evals": [
+    {
+      "id": 1,
+      "name": "freshly-translated-skill-md-default-flow",
+      "prompt": "I just translated /Users/tm/development/oss/almondoo-claude-plugins/plugins/skill-eval/skills/skill-eval/SKILL.md from Japanese to English and I am worried that the translation may have introduced ambiguous phrasing (missing qualifiers, undefined placeholders, contradictions between sections). Please audit it with the default settings (9 parallel auditors, ≥4/9 threshold). I have no specific exclusions beyond your built-in SKILL.md defaults — accept those. When you find fix candidates, run them through the safety checker and confirm with me one at a time.",
+      "expected_output": "Phase 1 confirms target, N=9, threshold=4, max_iterations=5 via AskUserQuestion. Phase 1 also pre-loads the four SKILL.md-specific exclusion defaults (subagent_type names / placeholder conventions / cross-skill informational pointers / frontmatter content owned by skill-eval) and lets the user accept all. Phase 1.5 drafts section purposes and confirms via batch AskUserQuestion. Phase 2 dispatches 9 sonnet subagents in one tool-call message with run_in_background=true. Phase 3 produces Table A (per-instance HIGH counts) and Table B (convergent issues ≥ 4/9). Phase 4.5 false-positive-detector filters shared blind spots (especially around subagent_type and placeholder names). Phase 4.6 skill-md-redundancy-checker classifies each REAL fix candidate against skill-creator / skill-eval / siblings. Phase 5 drafts fixes (single or multi-option per scope), Phase 5.5 safety-checks each, Phase 5.6 asks per fix. Phase 6 applies via Edit. Phase 7 re-verifies; Phase 8 stop condition.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor identifies that this task triggers skill-md-parallel-audit (not claude-md-parallel-audit because the target is a SKILL.md, and not skill-eval because the user asks for prose-level audit rather than structural scoring or A/B benchmarking)", "kind": "behavioral"},
+        {"text": "Phase 1 collects target_file, N, threshold, max_iterations via AskUserQuestion (not plain-text questions)", "kind": "behavioral"},
+        {"text": "Phase 1 pre-loads the four SKILL.md-specific exclusion defaults (subagent_type / placeholder conventions / cross-skill informational pointers / frontmatter) and presents them as multi-select", "kind": "behavioral"},
+        {"text": "Phase 1.5 drafts a 1-line purpose per top-level section by reading the SKILL.md, then confirms the full batch via a single AskUserQuestion", "kind": "behavioral"},
+        {"text": "Phase 2 dispatches all N=9 subagents in a single tool-call message with run_in_background: true, subagent_type general-purpose, model: \"sonnet\", using agents/auditor.md content as the prompt body (placeholders substituted, byte-identical across instances)", "kind": "behavioral"},
+        {"text": "The dispatch does not add 'be honest' / 'no sycophancy' instructions on top of auditor.md", "kind": "behavioral"},
+        {"text": "Phase 3 produces Table A (per-instance HIGH count, including avg row) and Table B (convergent issues with ≥4/9 threshold) and explicitly notes which issues match the pre-loaded SKILL.md exclusions", "kind": "format"},
+        {"text": "Phase 3 includes the main-thread-disputed hedge: any subagent finding the main thread would downgrade is surfaced to the user rather than quietly dropped", "kind": "behavioral"},
+        {"text": "Phase 4.5 dispatches a false-positive-detector subagent before drafting fixes whenever Phase 4 produces ≥1 fix candidate", "kind": "behavioral"},
+        {"text": "Phase 4.6 dispatches a skill-md-redundancy-checker subagent (NOT default-redundancy-checker) to classify each REAL fix candidate against skill-creator / skill-eval / siblings", "kind": "behavioral"},
+        {"text": "Phase 5 chooses single-proposal vs multi-option drafting based on fix scope (≤3 lines & no structural change → single; substantive → multi-option with trade-off labels)", "kind": "behavioral"},
+        {"text": "Phase 5.5 dispatches a fix-safety-checker subagent per fix (or per option in multi-option mode) before presenting to user", "kind": "behavioral"},
+        {"text": "Phase 5.6 asks one AskUserQuestion per fix candidate (not batched), with the option set matching the drafting mode", "kind": "behavioral"},
+        {"text": "Phase 6 applies approved Edits to the SKILL.md (and to any same-skill artifacts like references/eval-axes.md or scripts/render_report.py that the fix-safety-checker flagged as requiring synchronized updates)", "kind": "behavioral"},
+        {"text": "Phase 7 re-verify reuses the Phase 1.5 section purposes (does not re-collect) and updates the exclusion list with anything user added during Phase 5.6", "kind": "behavioral"},
+        {"text": "Phase 8 stop conditions are referenced explicitly (all-clean / ≥3 say clean / plateau / max_iterations / 0 fix candidates)", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "small-skill-light-audit",
+      "prompt": "I want a quick parallel audit on a small SKILL.md (/Users/tm/development/oss/almondoo-claude-plugins/.claude/skills/bump-plugin-version/SKILL.md is about 40 lines). 9-parallel is overkill — do N=3 / threshold=2 / max_iterations=2. No specific exclusions beyond the built-in defaults.",
+      "expected_output": "Phase 1 confirms N=3, threshold=2, max_iterations=2 via AskUserQuestion (parameter override from defaults), and pre-loads the SKILL.md-specific exclusion defaults. Phase 1.5 still runs (it is not skipped because N was lowered). Phase 2 dispatches exactly 3 subagents in a single tool-call message. Phase 3 Table A shows 3 instances only (not 9), Table B uses ≥2/3 threshold. Phase 4.5 / 4.6 / 5.5 specialized subagents are still invoked when fix candidates exist. Phase 7 re-verify dispatches N=3 again on subsequent iterations. Phase 8 stop condition adapts to N=3 and respects max_iterations=2.",
+      "files": [],
+      "assertions": [
+        {"text": "Phase 1 confirms N=3, threshold=2, max_iterations=2 via AskUserQuestion (parameter override accepted)", "kind": "behavioral"},
+        {"text": "Phase 1 still pre-loads the four SKILL.md-specific exclusion defaults even with smaller N", "kind": "behavioral"},
+        {"text": "Phase 1.5 still runs on the small SKILL.md and produces section purposes (it is not skipped because N was lowered)", "kind": "behavioral"},
+        {"text": "Phase 2 dispatches exactly N=3 subagents in a single tool-call message with run_in_background: true and model: \"sonnet\", using the byte-identical prompt from agents/auditor.md", "kind": "behavioral"},
+        {"text": "Phase 3 Table A shows per-instance HIGH count for instances #1, #2, #3 only — not 9", "kind": "format"},
+        {"text": "Phase 3 Table B applies the ≥2/3 threshold (not ≥4/9) for convergent issues", "kind": "behavioral"},
+        {"text": "Phase 4.5 / 4.6 / 5.5 specialized subagents are still invoked when fix candidates exist — they are not skipped despite smaller N", "kind": "behavioral"},
+        {"text": "Phase 8 stop condition adapts to N=3 (e.g., 'all N=3 instances report clean' OR '≥2 of 3 say clean' as practical convergence) and respects max_iterations=2", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "should-not-trigger-skill-eval-territory",
+      "prompt": "Can you score the structural quality of /Users/tm/development/oss/almondoo-claude-plugins/plugins/claude-md-parallel-audit/skills/claude-md-parallel-audit/SKILL.md and run an A/B benchmark with vs without the skill? I want to know if the skill is empirically helpful and whether the frontmatter passes the static axes.",
+      "expected_output": "The executor does NOT trigger skill-md-parallel-audit. It recognizes that the request asks for (a) structural scoring on static axes and (b) A/B benchmark — both owned by skill-eval, not by skill-md-parallel-audit (which only does prose-level multi-agent audits). The executor either invokes skill-eval directly or tells the user that skill-eval is the right tool for this request.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor does NOT invoke skill-md-parallel-audit's Phase 1 setup for this prompt", "kind": "behavioral"},
+        {"text": "The executor recognizes that 'score the structural quality' + 'A/B benchmark' map to skill-eval's static + dynamic layers, not to multi-agent prose audit", "kind": "behavioral"},
+        {"text": "The executor either invokes skill-eval directly or tells the user explicitly that skill-eval is the right tool for this request, citing the structural-vs-prose distinction", "kind": "behavioral"}
+      ]
+    }
+  ]
+}

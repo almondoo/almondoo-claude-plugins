@@ -51,6 +51,22 @@
         "skill-quality",
         "with-without-skill"
       ]
+    },
+    {
+      "name": "skill-md-parallel-audit",
+      "description": "Multi-agent parallel audit of SKILL.md files for HIGH-severity prose defects (missing qualifiers, cross-section contradictions, undefined terms). Sibling of claude-md-parallel-audit: same N-instance + reproducibility-threshold engine, retuned for SKILL.md (skill-specific exclusion defaults, redundancy classification against other skills).",
+      "source": "./plugins/skill-md-parallel-audit",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": [
+        "skill",
+        "skill-md",
+        "audit",
+        "multi-agent",
+        "parallel",
+        "review",
+        "convergence"
+      ]
     }
   ]
 }
