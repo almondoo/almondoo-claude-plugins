@@ -182,7 +182,7 @@ def check_frontmatter(fm: Optional[dict], dir_name: str) -> list[Check]:
         axis="frontmatter.description_length",
         passed=desc_ok,
         severity="warn",
-        evidence=f"{len(desc)} chars (Anthropic caps description + when_to_use combined at 1536; lower bound 50 is community heuristic)",
+        evidence=f"{len(desc)} chars (Anthropic caps the description field at 1536; lower bound 50 is community heuristic)",
     ))
     return out
 

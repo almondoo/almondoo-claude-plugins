@@ -14,10 +14,10 @@ The evaluation target is a directory that contains a single `SKILL.md`. Either a
 ## Why two layers
 
 - **Static alone** misses the "well-written but useless in practice" skill.
-- **Dynamic alone** misclassifies a skill as "good" when the LLM happened to push through on the day — and the result fails to reproduce in someone else's environment. Structural debt (body too long, over-imperative tone, no progressive disclosure) is also invisible to the execution benchmark.
+- **Dynamic alone** misclassifies a skill as "good" when the LLM happened to push through on that particular run — and the result fails to reproduce in someone else's environment. Structural debt (body too long, over-imperative tone, no progressive disclosure) is also invisible to the execution benchmark.
 - Producing both lets the judge demand "structurally sound AND measurably with > without" before shipping.
 
-The axis details live in `references/eval-axes.md`. The thesis that "a skill should explain *why* instead of leaning on `MUST` / `NEVER`" aligns with the claude-code-plugin convention (the Anthropic skill-creator "Writing Style" section).
+The axis details live in `references/eval-axes.md`. The thesis that "a skill should explain *why* instead of leaning on `MUST` / `NEVER`" aligns with the claude-code-plugin convention (the "Writing Style" section in Anthropic's `skill-creator` skill).
 
 ---
 
@@ -27,7 +27,7 @@ Collect the following from the user (skip whatever has already been provided):
 
 1. **target_skill_path** (required) — directory of the skill to evaluate, e.g. `/path/to/plugins/foo/skills/foo/`. `SKILL.md` must live directly under it.
 2. **eval prompts** (optional) — test prompts. If absent, auto-generate 3 from the static result and the SKILL.md description, then confirm.
-3. **runs_per_configuration** (optional) — number of repetitions per A/B configuration. Default 1. Suggest 3 only when variance is the question.
+3. **runs_per_configuration** (optional) — number of repetitions per A/B configuration. Default 1. Suggest 3 only when you need to measure variance.
 4. **skip dynamic?** (optional) — if the user wants static only, skip the dynamic layer.
 
 Ask via AskUserQuestion (do not ask through plain text output).
@@ -63,19 +63,20 @@ Axes (1:1 with the implementation; see `references/eval-axes.md` for details):
 
 | Axis | What it checks | Weight |
 |---|---|---|
+| frontmatter.present | YAML frontmatter block exists at the top of SKILL.md. Added only when frontmatter is missing — replaces every other frontmatter.* axis in that run | hard fail if missing |
 | frontmatter.name_matches_dir | `name:` matches the directory name (the official spec treats omission/mismatch as legal, so **warn** only) | warn |
 | frontmatter.description_present | description is non-empty | hard fail if missing |
 | frontmatter.description_has_trigger | description includes "when to use" cues (verb + context) | warn |
-| frontmatter.description_length | The official cap is `description + when_to_use` combined 1,536 chars (skills.md). The 50-char lower bound is a community heuristic | warn if outside |
+| frontmatter.description_length | The official cap on the `description` field (which embeds when-to-use guidance) is 1,536 chars. The 50-char lower bound is a community heuristic | warn if outside |
 | body.line_count | body (after frontmatter) ≤ 500 lines | warn over |
 | body.must_never_density | density of `MUST` / `NEVER` / `ALWAYS` (excluding code spans). High ≈ "why" is missing | warn |
 | body.no_emoji | no emoji in the body (U+1F300–1FAFF). Technical glyphs (→ ✓ ★ etc.) are exempt | warn |
-| structure.has_progressive_disclosure | at least one of references/ scripts/ assets/ exists | info (unnecessary when body is short) |
+| structure.has_progressive_disclosure | at least one of references/ scripts/ assets/ exists | info (unnecessary when the body is short — roughly ≤ 100 lines) |
 | structure.scripts_referenced_from_body | files under scripts/ are referenced from SKILL.md | warn unreferenced |
 | structure.references_referenced_from_body | same for references/ | warn unreferenced |
 
-**hard_fail semantics**: when any axis with severity=`hard_fail` fails, `hard_fail: true` is flagged and the score is capped at 0.4 (the mathematical reflection of a ship-blocker).
-**When frontmatter is absent**: only `frontmatter.present` (severity=hard_fail) is added; the rest of the frontmatter axes are skipped.
+**hard_fail semantics**: when any axis with severity=`hard_fail` fails, `hard_fail: true` is flagged and the score is capped at 0.4 — below the "Needs work" threshold — so that ship-blocker conditions cannot produce a high overall score.
+**When frontmatter is absent**: only `frontmatter.present` (severity=hard_fail) is added; the rest of the frontmatter axes are skipped. The body and structure axes still run.
 
 `static_check.py` writes the scoring to `static.json`, e.g.:
 
@@ -104,7 +105,7 @@ If `<target>/evals/evals.json` already exists, adopt it. Otherwise:
 2. Confirm "are these 3 fine for evaluation?" via AskUserQuestion (edit / add / OK).
 3. Once confirmed, persist them as `<workspace>/iteration-N/evals.json`.
 
-Prompt-writing guidance (same thesis as the skill-creator "Description Optimization" section):
+Prompt-writing guidance (same thesis as skill-creator's "Description Optimization" section — concrete, multi-step, realistic queries beat abstract ones):
 
 - Avoid abstract prompts (`"Format this data"`); use concrete details a real user would type (file name, column name, surrounding context).
 - Pick **multi-step / specialized** subjects that show off the skill — one-shot tasks that anyone can solve do not differentiate.
@@ -166,7 +167,7 @@ Save all outputs under:
 When done, write a short summary to outputs/SUMMARY.md describing what you produced.
 ```
 
-The completion notification of the Agent tool (the `<usage>` block in the return) includes `total_tokens` and `duration_ms`. Persist those **immediately** to `<run-dir>/timing.json` — once the completion notification has passed, the values cannot be retrieved later. Write per child agent as soon as its notification arrives.
+The Agent tool's completion notification includes `total_tokens` and `duration_ms`. Persist those **immediately** to `<run-dir>/timing.json` — once the completion notification has passed, the values cannot be retrieved later. Write per child agent as soon as its notification arrives.
 
 ```json
 { "total_tokens": 84852, "duration_ms": 23332, "total_duration_seconds": 23.3 }
@@ -224,13 +225,25 @@ python3 <this-skill-path>/scripts/aggregate_benchmark.py \
   --out <workspace>/iteration-N/benchmark.json
 ```
 
-The schema of `benchmark.json` is identical to the skill-creator `references/schemas.md` (`runs[]` / `run_summary.with_skill` / `run_summary.without_skill` / `delta`).
+The schema of `benchmark.json` is identical to the schema documented in skill-creator's `references/schemas.md` (`runs[]` / `run_summary.with_skill` / `run_summary.without_skill` / `delta`).
 
-Also emit `benchmark.md` as a human-readable table:
+Also emit `benchmark.md` as a human-readable table. The script produces a summary table plus a per-eval breakdown (verbatim from `aggregate_benchmark.py`):
 
 ```
-| eval | with pass | without pass | Δ pass | with sec | without sec | Δ tokens |
-| 1    | 1.00      | 0.33         | +0.67  | 42       | 30          | +1700    |
+## Summary
+
+| metric    | with_skill | without_skill | delta  |
+|-----------|------------|---------------|--------|
+| pass_rate | 1.0        | 0.333         | +0.667 |
+| time (s)  | 42.0       | 30.0          | +12.0  |
+| tokens    | 3800       | 2100          | +1700  |
+
+## Per-eval
+
+| eval                  | config        | pass | time  | tokens |
+|-----------------------|---------------|------|-------|--------|
+| extract-table-from-pdf | with_skill    | 3/3  | 42.0s | 3800   |
+| extract-table-from-pdf | without_skill | 1/3  | 30.0s | 2100   |
 ```
 
 ---
@@ -254,7 +267,7 @@ Minimal manual format:
 # skill-eval report: <skill-name>
 
 ## Verdict
-<one-liner: one of "Ship-ready" / "Needs work" / "Net negative" / "Inconclusive">
+<one-liner; pick exactly one: `Ship-ready` / `Needs work` / `Net negative` / `Inconclusive`>
 
 ## Static (score: <0.0-1.0> / hard_fail: <true|false>)
 - bullet pass/fail with evidence per axis
@@ -277,10 +290,10 @@ Minimal manual format:
 
 Verdict heuristics (use as guidance only; the user makes the final call):
 
-- **Ship-ready**: static score ≥ 0.8 and pass_rate delta ≥ +0.2
-- **Needs work**: static score 0.5–0.8 or pass_rate delta in +0.05–+0.2
-- **Net negative**: pass_rate delta ≤ 0, or both time and tokens at least 2× larger
-- **Inconclusive**: too few runs or high variance (stddev > mean × 0.3)
+- **Ship-ready**: static score ≥ 0.8 AND pass_rate delta ≥ +0.2
+- **Needs work**: static score between 0.5 and 0.8, OR pass_rate delta between +0.05 and +0.2
+- **Net negative**: pass_rate delta ≤ 0, OR both time and tokens at least 2× larger
+- **Inconclusive**: runs_per_configuration < 3, OR stddev > mean × 0.3 (the latter is only meaningful once runs_per_configuration ≥ 3)
 
 ---
 
@@ -301,7 +314,7 @@ Ask via AskUserQuestion (not free text) whenever a decision is required.
 - **No SKILL.md at target_skill_path**: hard fail. The user may have handed you the plugin root — glob `skills/*/SKILL.md` and offer the candidates.
 - **evals.json exists but assertions are empty**: same as skill-creator — propose from the prompts and confirm.
 - **Dynamic layer: pass_rate is 0 on both configurations**: the prompt is likely too hard or too ambiguous. Report says: rework the prompt.
-- **with_skill loses to without_skill**: the skill is net-negative. Before suspecting assertion quality, re-read SKILL.md and check whether it `MUST`-enforces the wrong procedure.
+- **with_skill loses to without_skill**: the skill is net-negative. Before suspecting assertion quality, re-read SKILL.md and check whether it uses `MUST` to enforce an incorrect procedure.
 
 ---
 

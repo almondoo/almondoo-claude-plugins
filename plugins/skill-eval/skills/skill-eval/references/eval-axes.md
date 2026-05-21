@@ -26,7 +26,7 @@ These are invisible to runtime benchmarks and must be caught statically.
 | `frontmatter.name_matches_dir` | If `name:` does not match the directory name, the plugin's skill-discovery logic breaks | author renamed the dir but forgot to update `name:` |
 | `frontmatter.description_present` | description is the sole signal for triggering — an empty one means the skill is never invoked | left out when copying from a template |
 | `frontmatter.description_has_trigger` | A description that only states "what it does" without "when to use" under-triggers (the official skill-creator flags this too) | abstract phrasing like "Format data" |
-| `frontmatter.description_length` | Anthropic caps `description + when_to_use` at **1,536 chars** combined (skills.md § "Skill descriptions are cut short"). The 50-char lower bound is a community heuristic — overly short descriptions tend to under-trigger | too verbose / too terse |
+| `frontmatter.description_length` | Anthropic caps the `description` field (which embeds when-to-use guidance) at **1,536 chars** (Claude Code `skills.md` reference, § "Skill descriptions are cut short"). The 50-char lower bound is a community heuristic — overly short descriptions tend to under-trigger | too verbose / too terse |
 
 #### What makes a description good
 

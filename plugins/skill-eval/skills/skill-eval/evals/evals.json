@@ -6,14 +6,14 @@
       "name": "static-only-clean-skill",
       "prompt": "Please grade the skill at /Users/tm/development/oss/almondoo-claude-plugins/plugins/configure-github-permissions/skills/configure-github-permissions/ using static evaluation only. The dynamic layer is not needed. Produce a report.",
       "expected_output": "static.json + report.md. No hard_fail, around 0-2 warnings, expected score 0.7 or higher.",
-      "expectations": [
-        "static.json is generated",
-        "static.json follows the canonical schema (top-level keys include all of score / hard_fail / warnings / checks / target)",
-        "static.json.score is reported as a number in 0.0-1.0 (not a custom scale like Grade A or out of 100)",
-        "static.json.checks is an array, and each element has axis / passed / severity / evidence fields",
-        "report.md includes a Static section and a verdict",
-        "The value of the hard_fail flag is reported",
-        "report.md notes that the dynamic layer was skipped"
+      "assertions": [
+        {"text": "static.json is generated", "kind": "factual"},
+        {"text": "static.json follows the canonical schema (top-level keys include all of score / hard_fail / warnings / checks / target)", "kind": "format"},
+        {"text": "static.json.score is reported as a number in 0.0-1.0 (not a custom scale like Grade A or out of 100)", "kind": "format"},
+        {"text": "static.json.checks is an array, and each element has axis / passed / severity / evidence fields", "kind": "format"},
+        {"text": "report.md includes a Static section and a verdict", "kind": "factual"},
+        {"text": "The value of the hard_fail flag is reported", "kind": "factual"},
+        {"text": "report.md notes that the dynamic layer was skipped", "kind": "factual"}
       ]
     },
     {
@@ -21,11 +21,11 @@
       "name": "ab-bench-real-skill",
       "prompt": "Run an A/B evaluation of the claude-md-parallel-audit skill (with vs without). One test prompt is enough: 'Audit this repository's CLAUDE.md'. One run per configuration is fine.",
       "expected_output": "benchmark.json + benchmark.md + report.md. Outputs for both with_skill and without_skill are saved under runs/, and pass_rate delta is computed.",
-      "expectations": [
-        "runs/eval-1/with_skill/ and runs/eval-1/without_skill/ both exist",
-        "benchmark.json includes run_summary.delta.pass_rate",
-        "A differentiating_assertions section exists (even if empty)",
-        "report.md verdict is one of: Ship-ready / Needs work / Net negative / Inconclusive"
+      "assertions": [
+        {"text": "runs/eval-1/with_skill/ and runs/eval-1/without_skill/ both exist", "kind": "factual"},
+        {"text": "benchmark.json includes run_summary.delta.pass_rate", "kind": "format"},
+        {"text": "A differentiating_assertions section exists (even if empty)", "kind": "format"},
+        {"text": "report.md verdict is one of: Ship-ready / Needs work / Net negative / Inconclusive", "kind": "format"}
       ]
     },
     {
@@ -33,10 +33,10 @@
       "name": "broken-skill-hard-fail",
       "prompt": "Create a skill directory at tmp/broken-skill/ (containing only a SKILL.md with no frontmatter) and evaluate it. It should detect hard_fail and skip the dynamic layer.",
       "expected_output": "static.json has hard_fail: true. The dynamic layer is not executed, and fix suggestions are written to report.md.",
-      "expectations": [
-        "hard_fail in static.json is true",
-        "report.md contains fix candidates (e.g., 'add frontmatter')",
-        "No subagent dispatch is performed (runs/ directory does not exist or is empty)"
+      "assertions": [
+        {"text": "hard_fail in static.json is true", "kind": "factual"},
+        {"text": "report.md contains fix candidates (e.g., 'add frontmatter')", "kind": "factual"},
+        {"text": "No subagent dispatch is performed (runs/ directory does not exist or is empty)", "kind": "behavioral"}
       ]
     }
   ]
