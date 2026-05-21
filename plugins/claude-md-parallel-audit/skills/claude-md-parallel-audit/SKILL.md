@@ -89,12 +89,12 @@ This phase runs once per audit, not per iteration. The purposes are stable acros
 
 Read `agents/auditor.md` and use its full content as the prompt for each subagent. Substitute the placeholders (`target_file_path`, `related_files_paths`, `exclusion_list`) with the values collected in Phase 1. The prompt must be **byte-identical** across all N instances — same placeholder substitution, no per-instance variation.
 
-Dispatch all `N` subagents in **one tool-call message** with `run_in_background: true` and `subagent_type: general-purpose`.
+Dispatch all `N` subagents in **one tool-call message** with `run_in_background: true`, `subagent_type: general-purpose`, and `model: "sonnet"`.
 
 Critical requirements:
 - All N subagents must be launched in the **same tool-call message** (parallel dispatch)
 - Use `run_in_background: true` so the harness notifies you on completion
-- Do NOT pass `model` parameter (let subagents inherit parent's model)
+- **Pass `model: "sonnet"` explicitly for Phase 2 only.** This overrides the general "subagents inherit parent's model" guideline because N=9 parallel auditors with an opus parent would be cost-prohibitive (~200-300k tokens/iteration × up to 5 iterations × opus rate). The HIGH-severity detection along the 7 axes is bounded enough that sonnet's quality suffices, and the ≥threshold aggregation absorbs per-instance noise. Phases 4.5 / 4.6 / 5.5 (single-agent verification) must still inherit the parent's model — only this Phase 2 parallel dispatch is sonnet-locked.
 - Do NOT add any "honest opinion" / "no sycophancy" / "be thorough" instruction on top of `agents/auditor.md` — the Forthright Assessment rules in the user's CLAUDE.md already cover this, and extra instructions would bias the audit
 - Do NOT modify the 7 axes, output format, or "what not to flag" section in `agents/auditor.md` per-iteration. Touch only the placeholders.
 
@@ -335,7 +335,7 @@ The `agents/` directory contains specialized subagent prompts referenced by spec
 
 | Agent file | Used in | Dispatched | Purpose |
 |---|---|---|---|
-| `agents/auditor.md` | Phase 2 | N parallel (default 9), `run_in_background: true` | Independent HIGH-severity audit along the 7 axes; each instance returns up to 10 findings as a markdown table |
+| `agents/auditor.md` | Phase 2 | N parallel (default 9), `run_in_background: true`, `model: "sonnet"` | Independent HIGH-severity audit along the 7 axes; each instance returns up to 10 findings as a markdown table |
 | `agents/false-positive-detector.md` | Phase 4.5 | 1 foreground | Independent re-read of each convergent issue to filter shared-blind-spot false positives before fix drafting |
 | `agents/default-redundancy-checker.md` | Phase 4.6 | 1 foreground | Classifies each REAL fix candidate as KEEP / SIMPLIFY / REMOVE based on whether the rule duplicates Claude Code default behavior |
 | `agents/fix-safety-checker.md` | Phase 5.5 | 1 per fix candidate (or 1 per option in multi-option mode), foreground | Verifies a proposed fix does not break cross-section references, contradict other rules, or distort intent; also reports rule-burden impact (REDUCES / NEUTRAL / INCREASES_MINOR / INCREASES_MAJOR) |

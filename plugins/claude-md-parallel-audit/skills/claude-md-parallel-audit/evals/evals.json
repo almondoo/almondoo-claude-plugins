@@ -3,21 +3,61 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "~/.claude/CLAUDE.md を独立検証として audit したい。9 subagent 並列で精読させて、HIGH severity の抜け漏れ・不整合を ≥4/9 で再現するものだけ修正対象として扱ってほしい。意図的設計の除外: 'English Feedback' セクションの不在、'1-horsepower cap' の比喩、find/grep の harness allow vs CLAUDE.md prohibition の dual-layer 設計、L102 vs L93/L103 の Tier 3 dual management (architectural tension として受容済)。",
-      "expected_output": "Phase 1 で除外を AskUserQuestion で確認、Phase 2 で 9 subagent を並列 dispatch、Phase 3 で per-instance HIGH count + convergent issues の 2 表を提示、Phase 4 で fix candidates と既知 tension を分離、Phase 5 で fix proposal を 1 件ずつ AskUserQuestion、convergence まで iterate。",
-      "files": []
+      "name": "global-claude-md-default-flow",
+      "prompt": "うちの ~/.claude/CLAUDE.md がだんだん長くなってきて、複数 section またがって用語ブレてないか・implicit な premise で読み手が詰まらないか心配。9 並列で independent に audit して、≥4/9 が引っかけたものだけ高信頼として扱ってほしい。意図的にこうしてある (= 再 flag されたら困る) ものは以下: (1) 'English Feedback' section は意図的に置いていない、(2) '1-horsepower cap' という比喩表現は意図的、(3) find/grep などを harness では allow しつつ CLAUDE.md では禁止する dual-layer 設計、(4) Tier 3 の dual management (deny rule + Claude 側 self-discipline) も意図的。これらを exclusion list として組み込んで進めてほしい。fix が必要そうな箇所が出たら、1 件ずつ確認させてくれ。",
+      "expected_output": "Phase 1 (inputs)・Phase 1.5 (section purposes) を AskUserQuestion で確認、Phase 2 で 9 subagent を single-message + run_in_background=true で並列 dispatch、Phase 3 で per-instance HIGH count と convergent issues の 2 つの表を提示、Phase 4 で fix candidates と既知 tension を分離、Phase 4.5 false-positive detector → Phase 4.6 default-redundancy-checker → Phase 5 fix drafting → Phase 5.5 fix-safety-checker → Phase 5.6 fix-per-question approval、~/.claude/CLAUDE.md は Claude Code agent config なので Edit が auto-mode classifier で block されたら Phase 6b playbook で対応、Phase 7 re-verify、Phase 8 stop condition。",
+      "files": [],
+      "expectations": [
+        "The executor identifies that this task triggers the claude-md-parallel-audit skill (not a single-pass review, not claude-md-improver, not revise-claude-md)",
+        "Phase 1 collects target_file, N, threshold, max_iterations, exclusions via AskUserQuestion (not plain-text questions)",
+        "Phase 1.5 drafts a 1-line purpose per top-level section by reading ~/.claude/CLAUDE.md, then confirms the full batch via AskUserQuestion",
+        "Phase 2 dispatches all N=9 subagents in a single tool-call message with run_in_background: true and subagent_type general-purpose, using agents/auditor.md content as the prompt body (placeholders substituted, prompt byte-identical across instances)",
+        "The dispatch does not pass the model parameter (subagents inherit parent's model) and does not add 'be honest' / 'no sycophancy' instructions on top of auditor.md",
+        "Phase 3 produces Table A (per-instance HIGH count) and Table B (convergent issues with ≥4/9 threshold) and explicitly notes which issues match the user-provided exclusions",
+        "Phase 3 includes the 'main-thread-disputed' hedge: any subagent finding the main thread would downgrade is surfaced to the user rather than quietly dropped",
+        "Phase 4.5 dispatches a false-positive-detector subagent before drafting fixes whenever Phase 4 produces ≥1 fix candidate",
+        "Phase 4.6 dispatches a default-redundancy-checker subagent to classify each REAL fix candidate as KEEP / SIMPLIFY / REMOVE",
+        "Phase 5 chooses single-proposal vs multi-option drafting based on fix scope (≤3 lines & no structural change → single; substantive → multi-option with trade-off labels)",
+        "Phase 5.5 dispatches a fix-safety-checker subagent per fix (or per option in multi-option mode) before presenting to user",
+        "Phase 5.6 asks one AskUserQuestion per fix candidate (not batched), with the option set matching the drafting mode",
+        "Because the target is ~/.claude/CLAUDE.md (Claude Code agent config), the executor anticipates Phase 6b auto-mode classifier denial and plans to use the 'はい、update my CLAUDE.md' authorization template if blocked",
+        "Phase 7 re-verify reuses the Phase 1.5 section purposes (does not re-collect) and updates the exclusion list with anything user added during Phase 5.6",
+        "Phase 8 stop conditions are referenced explicitly (all-clean / ≥3 say clean / plateau / max_iterations / 0 fix candidates)",
+        "The execution plan does NOT include 'one-shot single-pass audit' or 'I will just review the file myself' or 'I'll write a single critique' — the parallel multi-agent structure is preserved"
+      ]
     },
     {
       "id": 2,
-      "prompt": "うちの project の CLAUDE.md (`/Users/tm/development/oss/review-agent/CLAUDE.md`) が長くなってきて、section 間で矛盾している気がする。3 instance × ≥2/3 で軽めに audit して、structural な問題があれば指摘してほしい。",
-      "expected_output": "Phase 1 で N=3, threshold=2 を確認、target_file を project CLAUDE.md と確定、exclusions を user に聞く、Phase 2-4 を 3 instance で実施、convergent issues を提示、必要なら fix proposal、最大 5 iteration 以内に convergence。",
-      "files": []
+      "name": "project-claude-md-light-audit",
+      "prompt": "/Users/tm/development/oss/review-agent/CLAUDE.md がここ最近の追記で section 間の用語ブレてる気がする。本格的に 9 並列まではいらないので、3 instance × ≥2/3 で軽めに parallel audit してくれない? 除外したい意図的設計は特にない、もしあれば指摘してくれていい。max iteration も 3 ぐらいでいい。",
+      "expected_output": "Phase 1 で N=3, threshold=2, max_iterations=3 を AskUserQuestion で確認、exclusions が空であることも明示的に確認、target_file=/Users/tm/development/oss/review-agent/CLAUDE.md、Phase 1.5 section purposes、Phase 2 で 3 subagent を single-message 並列 dispatch、Phase 3 で 3-instance 規模の 2 表を提示、≥2/3 を fix candidate に、Phase 4.5/4.6/5/5.5/5.6 へ。max 3 iteration で stop。",
+      "files": [],
+      "expectations": [
+        "Phase 1 confirms N=3, threshold=2, max_iterations=3 via AskUserQuestion (parameter override from defaults)",
+        "Phase 1 collects exclusions and explicitly handles the 'empty list' case (does not skip the exclusion prompt)",
+        "Phase 1.5 still runs even with smaller N — it is not skipped because N was lowered",
+        "Phase 2 dispatches exactly N=3 subagents in a single tool-call message with run_in_background: true, using the same byte-identical prompt from agents/auditor.md",
+        "Phase 3 Table A shows per-instance HIGH count for instances #1, #2, #3 only — not 9",
+        "Phase 3 Table B applies the ≥2/3 threshold (not ≥4/9) for convergent issues",
+        "Phase 4.5/4.6/5.5 specialized subagents are still invoked when fix candidates exist — they are not skipped despite smaller N",
+        "Phase 7 re-verify dispatches N=3 again (not 9) on subsequent iterations",
+        "Phase 8 stop condition adapts to N=3 (e.g., 'all N=3 instances report clean' OR '≥2 of 3 say clean' as practical convergence) and respects max_iterations=3"
+      ]
     },
     {
       "id": 3,
-      "prompt": "global CLAUDE.md と project CLAUDE.md と CLAUDE.local.md が交錯していて、どこに何が書いてあるか整合性を取りたい。global CLAUDE.md だけを対象に multi-agent audit してほしい。default 設定でよい。除外は『過去 audit で受容済の architectural tensions』全般。",
-      "expected_output": "Phase 1 で target_file=~/.claude/CLAUDE.md、N=9 / threshold=4 / max_iter=5 を確認、exclusions が曖昧なので user に具体例を listing で出してもらうよう follow-up AskUserQuestion、その後 Phase 2 以降を標準フローで実行。",
-      "files": []
+      "name": "vague-exclusions-followup",
+      "prompt": "global の CLAUDE.md (~/.claude/CLAUDE.md) を multi-agent audit したい。default 設定でいい。除外は『過去 audit で受容済 architectural tensions 全般』ということで。",
+      "expected_output": "Phase 1 で N=9 / threshold=4 / max_iterations=5 を確認、exclusions が曖昧 (『過去受容済 architectural tensions 全般』) なので具体例を listing してもらうための follow-up AskUserQuestion (no plain-text)、user が具体項目を渡したら exclusion list を確定、その後 Phase 1.5 → Phase 2 以降は標準フローで実行。",
+      "files": [],
+      "expectations": [
+        "The executor detects that the exclusion description is too vague to act on ('過去受容済 architectural tensions 全般' is not a concrete list)",
+        "The executor uses AskUserQuestion (not plain text) to ask the user to enumerate specific exclusions — listing concrete examples like 'find/grep dual-layer design', 'Tier 3 dual management', etc. as a starting point for the user to confirm or revise",
+        "The executor does NOT proceed to Phase 2 with an empty or vague exclusion list — it understands that without concrete exclusions, subagents will re-flag intentional design every iteration and convergence will never reach",
+        "Once concrete exclusions are confirmed, Phase 1.5 (section purposes) and Phase 2 (9-instance parallel dispatch) proceed with the standard defaults (N=9, threshold=4, max_iterations=5)",
+        "The follow-up question presents exclusion candidates as multi-select options so the user can pick which ones apply, not free-text only",
+        "The executor explains the rationale for asking — exclusion clarity is critical for convergence — so the user understands why this follow-up is not bureaucratic friction"
+      ]
     }
   ]
 }
