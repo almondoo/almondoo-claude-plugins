@@ -1,135 +1,135 @@
-# Evaluation Axes — 詳細
+# Evaluation Axes — details
 
-skill-eval が出すスコアの根拠と、各軸を選んだ理由。`SKILL.md` の表を一段深掘りした参照ドキュメント。
+The rationale behind each score skill-eval emits, and why each axis is chosen. A deeper companion to the table in `SKILL.md`.
 
 ---
 
-## Static 層
+## Static layer
 
-### なぜ static を測るのか
+### Why measure static at all
 
-dynamic ベンチで「with > without」が出ても、それは LLM が頑張った結果かもしれない。SKILL.md の構造が悪い skill は:
+Even when the dynamic benchmark shows "with > without", that may just be the LLM working harder on the day. A skill with poor structure:
 
-- 配布先の環境で再現しない (依存ツールが暗黙)
-- 将来の Claude モデルで挙動が変わったとき直しにくい
-- 他人が読んで「いつ呼ぶべきか」が分からない
+- Fails to reproduce in the recipient's environment (implicit tool dependencies).
+- Becomes hard to fix when a future Claude model changes behavior.
+- Leaves readers unsure of "when should I invoke this".
 
-これらは実測ベンチでは見えないので静的に押さえる必要がある。
+These are invisible to runtime benchmarks and must be caught statically.
 
 ---
 
 ### frontmatter
 
-| axis | 意図 | 失敗時の典型原因 |
+| axis | intent | typical failure cause |
 |---|---|---|
-| `frontmatter.present` | YAML frontmatter があるか。ない skill は Claude Code の skill loader が読まない | `---` を書き忘れた / フォーマットミス |
-| `frontmatter.name_matches_dir` | `name:` がディレクトリ名と一致しないと plugin の skill 発見ロジックが破綻する | リネーム時に name を更新し忘れた |
-| `frontmatter.description_present` | description は triggering の唯一の判断材料。空だと一生呼ばれない | template から消し忘れ |
-| `frontmatter.description_has_trigger` | description が「何をするか」だけで「いつ使うか」を書いていないと under-trigger になる (公式 skill-creator が指摘) | 「Format data」のような抽象表現 |
-| `frontmatter.description_length` | Anthropic は `description + when_to_use` 合算で **1,536 字** を上限としている (skills.md § Skill descriptions are cut short)。下限 50 字は短すぎる description が under-trigger になる傾向からの community heuristic | 説明過多 / 過少 |
+| `frontmatter.present` | A YAML frontmatter must exist — the Claude Code skill loader skips files that lack it | missing `---` / malformed block |
+| `frontmatter.name_matches_dir` | If `name:` does not match the directory name, the plugin's skill-discovery logic breaks | author renamed the dir but forgot to update `name:` |
+| `frontmatter.description_present` | description is the sole signal for triggering — an empty one means the skill is never invoked | left out when copying from a template |
+| `frontmatter.description_has_trigger` | A description that only states "what it does" without "when to use" under-triggers (the official skill-creator flags this too) | abstract phrasing like "Format data" |
+| `frontmatter.description_length` | Anthropic caps `description + when_to_use` at **1,536 chars** combined (skills.md § "Skill descriptions are cut short"). The 50-char lower bound is a community heuristic — overly short descriptions tend to under-trigger | too verbose / too terse |
 
-#### description の良し悪し
+#### What makes a description good
 
-公式 skill-creator の例:
+From the official skill-creator examples:
 
-- ❌ `"How to build a dashboard"` — 何をするかは分かるが「いつ」が無い
-- ✅ `"How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"` — when/what/edge-case が揃っている
+- Bad: `"How to build a dashboard"` — says *what* but not *when*.
+- Good: `"How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"` — when, what, and edge-cases are all present.
 
-skill-eval は trigger 語彙 (`when` / `use` / `whenever` / `if` / `before` / `after` / `trigger`) の出現で簡易判定するが、これは proxy なので過信しない。最終判断は人間が `report.md` を見て決める。
+skill-eval uses a trigger-vocabulary heuristic (`when` / `use` / `whenever` / `if` / `before` / `after` / `trigger`) as a proxy — do not over-trust it. The human reads `report.md` and decides.
 
 ---
 
 ### body
 
-| axis | 意図 |
+| axis | intent |
 |---|---|
-| `body.line_count` | 公式ガイドの目安 ≤ 500 行。本体が長いと毎回 context を食う上、Claude が読み飛ばすリスクが高い |
-| `body.must_never_density` | `MUST` / `NEVER` / `ALWAYS` が多い skill は「なぜそうすべきか」を説明していない兆候。コードスパン内 (バックティック / fenced block) の出現はメタ言及とみなし除外する |
-| `body.no_emoji` | Anthropic の global "Only use emojis if the user explicitly requests it" 規約。skill 本体での絵文字使用は出力にも伝染しやすく、ユーザーの好みを超えて干渉する。コードスパン内は除外 (チェックボックス記号などの説明用途は許容) |
+| `body.line_count` | The official guideline target is ≤ 500 lines. A long body eats context every turn and raises the chance Claude skims past important parts |
+| `body.must_never_density` | A high density of `MUST` / `NEVER` / `ALWAYS` signals that the author did not explain *why*. Occurrences inside code spans (backticks / fenced blocks) are treated as meta-mentions and excluded |
+| `body.no_emoji` | Anthropic's global rule is "Only use emojis if the user explicitly requests it". Emoji in the skill body easily bleeds into outputs and overrides user preference. Code-span occurrences are exempt (so checkbox glyphs etc. used for illustration are fine) |
 
-#### why density matters
+#### Why density matters
 
-公式 skill-creator の Writing Style 節:
+From the official skill-creator "Writing Style" section:
 
 > Try to explain to the model why things are important in lieu of heavy-handed musty MUSTs. Use theory of mind and try to make the skill general and not super-narrow to specific examples.
 
-`MUST` を多用すると:
+Overusing `MUST`:
 
-- LLM が言葉の意味を「ルール」として字句通り守ろうとし、edge case で柔軟性を失う
-- 著者が why を考えていない兆候。後で別の Claude モデルが読むと挙動が割れる
-- skill の総量が伸びる (each rule needs its own line)
+- The LLM treats the wording as a literal rule and loses flexibility at edge cases.
+- It's a tell that the author did not think about *why*. Another Claude model reading it later may interpret behavior differently.
+- Each rule needs its own line, inflating skill size.
 
-10/100 行を超えるとカウントが上がりすぎ。これは経験則。
+More than 10 per 100 lines is too many. This is a rule of thumb.
 
 ---
 
 ### structure
 
-| axis | 意図 |
+| axis | intent |
 |---|---|
-| `structure.has_progressive_disclosure` | 本体が長いなら `references/` / `scripts/` / `assets/` に分割すべき。短い skill (~100 行) なら不要 |
-| `structure.scripts_referenced_from_body` | scripts/ にあるのに本体から参照されていないスクリプトはデッドコード。`scripts/foo.py` を本体で名前出ししているかを確認 |
-| `structure.references_referenced_from_body` | 同上 |
+| `structure.has_progressive_disclosure` | Long skills should be split into `references/` / `scripts/` / `assets/`. Short skills (~100 lines) do not need this |
+| `structure.scripts_referenced_from_body` | A script under `scripts/` that is never named in the body is dead code. The check looks for the filename (e.g. `scripts/foo.py`) being mentioned in `SKILL.md` |
+| `structure.references_referenced_from_body` | Same idea for `references/` |
 
-scripts/references が本体から呼ばれていないと、Claude は読み込まないので 100% 役に立たない (load-on-demand)。
+Scripts and references that the body never names are not loaded by Claude (load-on-demand), so they are 100% inert.
 
 ---
 
-## Manual 観点 (機械化未実装、レビュアー向けチェックリスト)
+## Manual perspective (not yet mechanized — reviewer checklist)
 
-iteration-2 の baseline (without-skill 評価) が指摘した観点のうち、機械化が難しいものを記録する。`static_check.py` には含まれないが、人間レビューや LLM grader に渡すプロンプトでは観点として有用。
+Observations raised by the iteration-2 baseline (without-skill evaluation) that are hard to mechanize. These are not part of `static_check.py`, but are useful inputs for a human reviewer or an LLM grader prompt.
 
-| axis | チェック方法 | なぜ機械化していないか |
+| axis | how to check | why not mechanized yet |
 |---|---|---|
-| `tool_usage_explicit` | SKILL.md の各手順ステップで、使うべきツール (Read / Edit / Bash 等) が明示されているか | 「ステップ」の境界をパースする決定的方法がない (見出し階層・番号付きリスト等の表現が skill 著者で違う) |
-| `cross_file_consistency` | SKILL.md / plugin.json / README.md / marketplace.json でカテゴリ数・既定値・skill 名が一致するか | プラグインごとに「整合すべきフィールド」が違うので一般化が難しい |
-| `destructive_ops_safety_alignment` | 破壊的操作のデフォルトが deny / ask になっており、global CLAUDE.md の Tier-3 と整合しているか | 「何が破壊的か」の判定は LLM 推論が必要 |
-| `output_format_specified` | 出力ファイルのフォーマット (JSON schema・ファイル名・改行など) が明示されているか | "明示" の閾値が曖昧 |
+| `tool_usage_explicit` | For each procedural step in SKILL.md, is the tool to use (Read / Edit / Bash / etc.) named explicitly | "step boundary" has no deterministic parse — authors mix headings, numbered lists, and prose |
+| `cross_file_consistency` | Do `SKILL.md` / `plugin.json` / `README.md` / `marketplace.json` agree on category count, defaults, and skill names | which fields "must agree" varies per plugin, so it generalizes poorly |
+| `destructive_ops_safety_alignment` | Are destructive ops defaulted to deny / ask, aligned with the global CLAUDE.md Tier-3 rule | classifying "what is destructive" requires LLM judgment |
+| `output_format_specified` | Are the output file format (JSON schema, file name, newline policy) explicitly stated | the threshold for "explicit" is fuzzy |
 
-これらは LLM grader (将来) を回す際にプロンプトへ含めるためのリストとして残す。
+These are kept here as the prompt material to feed a future LLM-grader run.
 
 ---
 
-## Dynamic 層
+## Dynamic layer
 
-### なぜ A/B で測るのか
+### Why A/B
 
-「skill が役に立っているかどうか」は同じプロンプトを skill 有り/無しで走らせて初めて分かる。skill-creator の benchmark 機構と同じ思想。
+The only way to know "is this skill helping" is to run the same prompts with and without it. Same idea as the skill-creator benchmark.
 
-### 観測する指標
+### Metrics observed
 
-| metric | 何を意味するか | 良し悪し |
+| metric | what it means | how to read it |
 |---|---|---|
-| `pass_rate` delta | with - without。skill の付加価値そのもの | +0.2 以上で「明確に価値あり」 |
-| `time_seconds` delta | with の方が遅くなりがち (skill を読む分) | +30 秒くらいまでは許容、それ以上は body 圧縮の余地 |
-| `tokens` delta | with の方が消費が多い | pass_rate 改善とのトレードオフで判断 |
-| stddev | 分散。3 run 以上回したときに見る | mean × 0.3 を超えるなら flaky |
-| `differentiating_assertions` | with-skill だけが通せた assertion | これが 0 件なら skill は実質効いていない |
+| `pass_rate` delta | with − without. The marginal value of the skill itself | ≥ +0.2 means "clearly valuable" |
+| `time_seconds` delta | with tends to be slower (the body has to be read) | up to +30 s is tolerable; beyond that, consider compressing the body |
+| `tokens` delta | with consumes more | judge against the pass_rate gain |
+| stddev | variance — relevant once runs_per_configuration ≥ 3 | flaky if stddev > mean × 0.3 |
+| `differentiating_assertions` | assertions that only the with-skill side passed | zero of these means the skill isn't really doing anything |
 
-### 注意点
+### Notes
 
-- **with の方が遅いのは正常** — skill 本体を context に積む分、初動が遅れる。問題は遅さよりも pass_rate に見合っているか
-- **without_skill が完璧に通る場合** — その task は Claude が単独で解けるので、その skill の存在意義をプロンプト選定から見直すべき
-- **with_skill が悪化** — skill が誤った手順を強制している可能性が高い (`MUST` で間違ったやり方を矯正している等)
+- **with-skill being slower is normal** — reading the body adds startup latency. The question is whether the slowdown is justified by the pass_rate gain.
+- **without_skill passing perfectly** — the task is solvable by Claude alone, so the prompt is the wrong evaluation subject; rethink the prompt selection rather than the skill.
+- **with_skill is worse than without_skill** — the skill is likely enforcing the wrong procedure (e.g. a `MUST` is pushing an incorrect approach).
 
 ---
 
-## verdict ヒューリスティクス
+## Verdict heuristics
 
-`SKILL.md` で言及した判定ロジックの根拠:
+The rationale behind the decision logic mentioned in `SKILL.md`:
 
-| verdict | 条件 | 直感 |
+| verdict | condition | intuition |
 |---|---|---|
-| **Ship-ready** | static ≥ 0.8 かつ pass_rate delta ≥ +0.2 | 静的にもまともで、効果も実測される |
-| **Needs work** | 上記未満で、明らかに net negative ではない | 配布前にもう一段の改善余地 |
-| **Net negative** | pass_rate delta ≤ 0、または time × 2 以上 & token × 2 以上 | skill 無しの方が良い |
-| **Inconclusive** | runs_per_configuration < 3 または stddev > mean × 0.3 | サンプル不足 / 分散が大きい |
+| **Ship-ready** | static ≥ 0.8 AND pass_rate delta ≥ +0.2 | structurally sound and empirically helpful |
+| **Needs work** | not the above, but not net-negative | one more round of polish before shipping |
+| **Net negative** | pass_rate delta ≤ 0, or time ≥ 2× AND tokens ≥ 2× | better off without the skill |
+| **Inconclusive** | runs_per_configuration < 3, or stddev > mean × 0.3 | not enough samples / too noisy |
 
-これらは絶対値ではない。例えば `time delta +200s` でも pass_rate が +0.6 上がるなら ship する価値はある。最終判断はユーザー。
+These are not absolutes. E.g. a `time delta +200s` can still be worth shipping if the pass_rate climbs by +0.6. The user makes the final call.
 
 ---
 
-## 参考リンク
+## References
 
-- claude-plugins-official `skill-creator/SKILL.md` の "Skill Writing Guide" と "Description Optimization" 節
-- claude-plugins-official `skill-creator/references/schemas.md` (benchmark.json スキーマ)
+- "Skill Writing Guide" and "Description Optimization" sections of claude-plugins-official `skill-creator/SKILL.md`
+- claude-plugins-official `skill-creator/references/schemas.md` (benchmark.json schema)

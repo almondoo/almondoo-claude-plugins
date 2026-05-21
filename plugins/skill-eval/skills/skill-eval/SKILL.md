@@ -5,78 +5,79 @@ description: Evaluate any Claude Code skill on two layers — (1) static structu
 
 # skill-eval
 
-任意の Claude Code skill を **static + dynamic の二層** で評価し、人間向けレポートと機械可読な JSON を出力する。
+Evaluate any Claude Code skill on **two layers — static + dynamic** and emit both a human-readable report and a machine-readable JSON.
 
-評価対象は SKILL.md を 1 つ含むディレクトリ。プラグイン (`.claude-plugin/plugin.json` 配下の `skills/*`) 単体の skill ディレクトリのどちらでも受け取れる。
-
----
-
-## なぜ二層なのか
-
-- **Static だけ**だと "綺麗に書かれているが実際は役に立たない skill" を見逃す。
-- **Dynamic だけ**だと、たまたま LLM が頑張って合格しただけの skill を「良い」と判定してしまい、配布された他人の環境で再現しないリスクがある。さらに、構造上の負債 (本体が長すぎる / 命令調過多 / progressive disclosure を使っていない) は実行ベンチでは見えない。
-- 両方を出すことで、「静的にも筋が良く、かつ実測でも with > without の差が出ている」という基準で skill を judge できる。
-
-評価軸の詳細は `references/eval-axes.md`。`MUST` / `NEVER` を使わずに why を書く skill が良い、という思想は claude-code-plugin 規約 (Anthropic skill-creator の "Writing Style" 節) と整合させている。
+The evaluation target is a directory that contains a single `SKILL.md`. Either a standalone skill directory or a per-plugin skill directory (`skills/*` under a `.claude-plugin/plugin.json`) is accepted.
 
 ---
 
-## 入力
+## Why two layers
 
-ユーザーから以下を聞き取る (既に明示されていれば省略):
+- **Static alone** misses the "well-written but useless in practice" skill.
+- **Dynamic alone** misclassifies a skill as "good" when the LLM happened to push through on the day — and the result fails to reproduce in someone else's environment. Structural debt (body too long, over-imperative tone, no progressive disclosure) is also invisible to the execution benchmark.
+- Producing both lets the judge demand "structurally sound AND measurably with > without" before shipping.
 
-1. **target_skill_path** (必須) — 評価したい skill のディレクトリ。例: `/path/to/plugins/foo/skills/foo/`。SKILL.md が直下に必要。
-2. **eval prompts** (任意) — テストプロンプト。未指定なら static 結果と SKILL.md の description から 3 件を自動生成して確認を取る。
-3. **runs_per_configuration** (任意) — A/B 各構成の試行回数。デフォルト 1。分散を見たいときだけ 3 を提案。
-4. **skip dynamic?** (任意) — Static だけで良いと言われたら dynamic 層をスキップ。
-
-聞くときは AskUserQuestion を使う (テキスト出力で聞かない)。
+The axis details live in `references/eval-axes.md`. The thesis that "a skill should explain *why* instead of leaning on `MUST` / `NEVER`" aligns with the claude-code-plugin convention (the Anthropic skill-creator "Writing Style" section).
 
 ---
 
-## ワークフロー全体像
+## Inputs
+
+Collect the following from the user (skip whatever has already been provided):
+
+1. **target_skill_path** (required) — directory of the skill to evaluate, e.g. `/path/to/plugins/foo/skills/foo/`. `SKILL.md` must live directly under it.
+2. **eval prompts** (optional) — test prompts. If absent, auto-generate 3 from the static result and the SKILL.md description, then confirm.
+3. **runs_per_configuration** (optional) — number of repetitions per A/B configuration. Default 1. Suggest 3 only when variance is the question.
+4. **skip dynamic?** (optional) — if the user wants static only, skip the dynamic layer.
+
+Ask via AskUserQuestion (do not ask through plain text output).
+
+---
+
+## Workflow overview
 
 ```
-[Step 1] static_check.py で構造採点 → static.json
-[Step 2] eval prompts を確定 (ユーザー提示 or 自動生成して合意)
-[Step 3] 各 prompt について with_skill / without_skill subagent を同一ターンで並列 dispatch
-[Step 4] 出力を grader (agents/grader.md) で assertion 採点 → grading.json
-[Step 5] aggregate_benchmark.py で benchmark.json + benchmark.md を生成
-[Step 6] static + dynamic を合体した report.md を書く
+[Step 1] static_check.py scores structure          → static.json
+[Step 2] confirm eval prompts (provided or auto-generated)
+[Step 3] for each prompt, dispatch with_skill / without_skill subagents
+         in parallel within the same turn
+[Step 4] grader (agents/grader.md) scores each run against assertions → grading.json
+[Step 5] aggregate_benchmark.py emits benchmark.json + benchmark.md
+[Step 6] write a unified report.md combining static + dynamic
 ```
 
-ワークスペースは target_skill_path のサイドに `<skill-name>-eval-workspace/iteration-N/` を作る。skill-creator のレイアウトを意識しているので、後で skill-creator に持ち込んで iterate もできる。
+The workspace lives alongside `target_skill_path` as `<skill-name>-eval-workspace/iteration-N/`. The layout mirrors skill-creator's so that the workspace can later be carried into skill-creator for further iteration.
 
 ---
 
-## Step 1: Static 採点
+## Step 1: Static scoring
 
-`scripts/static_check.py` を実行する:
+Run `scripts/static_check.py`:
 
 ```bash
 python3 <this-skill-path>/scripts/static_check.py <target_skill_path> \
   --out <workspace>/iteration-N/static.json
 ```
 
-採点軸 (実装と 1:1 対応、詳細は `references/eval-axes.md`):
+Axes (1:1 with the implementation; see `references/eval-axes.md` for details):
 
-| 軸 | 内容 | 重み |
+| Axis | What it checks | Weight |
 |---|---|---|
-| frontmatter.name_matches_dir | `name:` がディレクトリ名と一致 (公式仕様では omission も mismatch も合法なので **warn**) | warn |
-| frontmatter.description_present | description が空でない | hard fail if no |
-| frontmatter.description_has_trigger | description が "when to use" の手がかりを含む (動詞 + 文脈) | warn |
-| frontmatter.description_length | 公式上限は `description + when_to_use` 合算 1,536 字 (skills.md)。下限 50 は community heuristic | warn 外れたら |
-| body.line_count | 本体 (frontmatter 後) の行数 ≤ 500 | warn over |
-| body.must_never_density | `MUST` / `NEVER` / `ALWAYS` の出現密度 (コードスパン除外)。高すぎる ≒ why が書かれていない兆候 | warn |
-| body.no_emoji | 本体に絵文字 (U+1F300-1FAFF) が混入していない。技術記号 (→ ✓ ★ 等) は対象外 | warn |
-| structure.has_progressive_disclosure | references/ scripts/ assets/ のいずれかが存在 | info (body が短ければ不要) |
-| structure.scripts_referenced_from_body | scripts/ のファイルが SKILL.md から参照されている | warn unreferenced |
-| structure.references_referenced_from_body | references/ も同上 | warn unreferenced |
+| frontmatter.name_matches_dir | `name:` matches the directory name (the official spec treats omission/mismatch as legal, so **warn** only) | warn |
+| frontmatter.description_present | description is non-empty | hard fail if missing |
+| frontmatter.description_has_trigger | description includes "when to use" cues (verb + context) | warn |
+| frontmatter.description_length | The official cap is `description + when_to_use` combined 1,536 chars (skills.md). The 50-char lower bound is a community heuristic | warn if outside |
+| body.line_count | body (after frontmatter) ≤ 500 lines | warn over |
+| body.must_never_density | density of `MUST` / `NEVER` / `ALWAYS` (excluding code spans). High ≈ "why" is missing | warn |
+| body.no_emoji | no emoji in the body (U+1F300–1FAFF). Technical glyphs (→ ✓ ★ etc.) are exempt | warn |
+| structure.has_progressive_disclosure | at least one of references/ scripts/ assets/ exists | info (unnecessary when body is short) |
+| structure.scripts_referenced_from_body | files under scripts/ are referenced from SKILL.md | warn unreferenced |
+| structure.references_referenced_from_body | same for references/ | warn unreferenced |
 
-**hard_fail のセマンティクス**: severity=`hard_fail` の軸が 1 つでも fail すると、`hard_fail: true` がフラグされ score が 0.4 にキャップされる (ship-blocker の数学的反映)。
-**frontmatter が無い場合**: `frontmatter.present` (severity=hard_fail) のみが追加され、他の frontmatter 系チェックは skip される。
+**hard_fail semantics**: when any axis with severity=`hard_fail` fails, `hard_fail: true` is flagged and the score is capped at 0.4 (the mathematical reflection of a ship-blocker).
+**When frontmatter is absent**: only `frontmatter.present` (severity=hard_fail) is added; the rest of the frontmatter axes are skipped.
 
-`static_check.py` は配点を `static.json` に書き出す。例:
+`static_check.py` writes the scoring to `static.json`, e.g.:
 
 ```json
 {
@@ -91,25 +92,25 @@ python3 <this-skill-path>/scripts/static_check.py <target_skill_path> \
 }
 ```
 
-`hard_fail: true` の場合は dynamic 層を実行せず、修正を促す。
+If `hard_fail: true`, do not run the dynamic layer — prompt the user to fix instead.
 
 ---
 
-## Step 2: Eval prompts の確定
+## Step 2: Confirm eval prompts
 
-`<target>/evals/evals.json` がもう存在するならそれを採用する。なければ:
+If `<target>/evals/evals.json` already exists, adopt it. Otherwise:
 
-1. SKILL.md の description と body から **3 件** のテストプロンプトを生成
-2. AskUserQuestion で「この 3 件で評価して良いか」を確認 (修正 / 追加 / OK)
-3. 確定したら `<workspace>/iteration-N/evals.json` に保存
+1. Generate **3** test prompts from the description and body of SKILL.md.
+2. Confirm "are these 3 fine for evaluation?" via AskUserQuestion (edit / add / OK).
+3. Once confirmed, persist them as `<workspace>/iteration-N/evals.json`.
 
-プロンプトを書くときの注意 (skill-creator の Description Optimization 節と同じ思想):
+Prompt-writing guidance (same thesis as the skill-creator "Description Optimization" section):
 
-- 抽象的 (`"Format this data"`) ではなく、ユーザーが実際にタイプしそうな具体性 (ファイル名・列名・背景) を入れる
-- skill が真価を発揮する **multi-step / specialized** な題材を選ぶ (one-shot で誰でも解けるものは差が出ない)
-- skill の description が想定していない「近傍タスク」も 1 件混ぜると、過剰トリガーや誤適用の検出に役立つ
+- Avoid abstract prompts (`"Format this data"`); use concrete details a real user would type (file name, column name, surrounding context).
+- Pick **multi-step / specialized** subjects that show off the skill — one-shot tasks that anyone can solve do not differentiate.
+- Mix in one "neighbor task" that the description does not anticipate. This catches over-triggering and misapplication.
 
-各プロンプトに assertion を 2〜4 件付ける:
+Attach 2–4 assertions per prompt:
 
 ```json
 {
@@ -117,10 +118,10 @@ python3 <this-skill-path>/scripts/static_check.py <target_skill_path> \
     {
       "id": 1,
       "name": "extract-table-from-quarterly-pdf",
-      "prompt": "Q4 sales final FINAL v2.xlsx を CSV 化して...",
+      "prompt": "Convert Q4 sales final FINAL v2.xlsx to CSV...",
       "assertions": [
-        {"text": "出力に Revenue 列が含まれる", "kind": "factual"},
-        {"text": "金額が数値型として保存されている", "kind": "format"}
+        {"text": "output contains a Revenue column", "kind": "factual"},
+        {"text": "amounts are stored as a numeric type", "kind": "format"}
       ]
     }
   ]
@@ -129,11 +130,11 @@ python3 <this-skill-path>/scripts/static_check.py <target_skill_path> \
 
 ---
 
-## Step 3: A/B 並列 dispatch
+## Step 3: A/B parallel dispatch
 
-**重要: 同一ターンで全 prompt × 2 構成を並列 dispatch する。** 後追いで baseline を回すと条件 (時刻・モデル混雑) がずれて比較性が落ちる。
+**Important: dispatch every prompt × both configurations in the same turn.** Running the baseline later misaligns conditions (time-of-day, model load) and ruins comparability.
 
-各 prompt について 2 つの Agent (`subagent_type: general-purpose`) を `run_in_background: true` で launch:
+For each prompt, launch two Agents (`subagent_type: general-purpose`) with `run_in_background: true`:
 
 ### with-skill subagent
 
@@ -165,26 +166,26 @@ Save all outputs under:
 When done, write a short summary to outputs/SUMMARY.md describing what you produced.
 ```
 
-タスク完了通知 (Agent ツールの返り値 `<usage>` ブロック) に含まれる `total_tokens` と `duration_ms` を **即時** に `<run-dir>/timing.json` へ保存する。完了通知が一度過ぎると後から取得できないため、子 agent ごとに通知を受け取った直後に write すること。
+The completion notification of the Agent tool (the `<usage>` block in the return) includes `total_tokens` and `duration_ms`. Persist those **immediately** to `<run-dir>/timing.json` — once the completion notification has passed, the values cannot be retrieved later. Write per child agent as soon as its notification arrives.
 
 ```json
 { "total_tokens": 84852, "duration_ms": 23332, "total_duration_seconds": 23.3 }
 ```
 
-`timing.json` が無い run は aggregator 側で `null` として扱われ stats から除外される (見せかけの 0 にはならない)。
+Runs with no `timing.json` are treated as `null` by the aggregator and excluded from stats (so they don't masquerade as a zero).
 
-### dispatch の判断基準
+### Dispatch decision criteria
 
-- 評価対象 skill が **read-only / safe** であることを SKILL.md ざっと読みで確認。外部書き込み (PR 作成・メール送信等) を含む skill は subagent ではなく sandbox 化を必要とする (現状はユーザーに警告して dynamic 層スキップを提案)。
-- prompt × 構成 が多い (例: 3 × 2 × 3 試行 = 18) と並列度が暴れるので、`runs_per_configuration > 1` のときは 6 並列ずつバッチに分ける。
+- Verify the target skill is **read-only / safe** by skimming its SKILL.md. Skills that perform external writes (PR creation, email send, etc.) need sandboxing rather than plain subagents — for now, warn the user and offer to skip the dynamic layer.
+- A high prompt-by-configuration count (e.g. 3 × 2 × 3 runs = 18) can blow up parallelism. When `runs_per_configuration > 1`, batch in groups of 6.
 
 ---
 
-## Step 4: Grader による採点
+## Step 4: Grading
 
-全 run 完了後、`agents/grader.md` (これは frontmatter 無しの**プロンプトテンプレート**で、Claude Code agent ではない) を subagent に Read させるか、または inline で内容を貼り付けて各 run の outputs を assertion と突き合わせる。
+Once every run has completed, hand each run's outputs and assertions to `agents/grader.md` (this is a **prompt template without frontmatter** — not a Claude Code agent file). Either Read it into a subagent or paste its contents inline.
 
-grader への入力例:
+Example grader input:
 
 ```
 Read this prompt template: <this-skill-path>/agents/grader.md (absolute path)
@@ -194,7 +195,7 @@ Apply it to grade this run:
 Write grading.json to the run directory.
 ```
 
-`grading.json` の schema (skill-creator viewer 互換):
+`grading.json` schema (compatible with the skill-creator viewer):
 
 ```json
 {
@@ -206,15 +207,15 @@ Write grading.json to the run directory.
 }
 ```
 
-フィールド名 (`expectations` / `text` / `passed` / `evidence` / `summary`) はすべて aggregator と viewer が key で読むので変えない。
+The field names (`expectations` / `text` / `passed` / `evidence` / `summary`) are read by key in the aggregator and the viewer — do not rename them.
 
-プログラム的に検証できる assertion (ファイル存在・正規表現一致など) は grader に「スクリプトを書いて確かめろ」と促す。eyeballing は遅くて不安定。
+For programmatically verifiable assertions (file existence, regex match, etc.), instruct the grader to "write a small script to verify". Eyeballing is slow and unreliable.
 
 ---
 
-## Step 5: 集約
+## Step 5: Aggregation
 
-`scripts/aggregate_benchmark.py` を実行:
+Run `scripts/aggregate_benchmark.py`:
 
 ```bash
 python3 <this-skill-path>/scripts/aggregate_benchmark.py \
@@ -223,9 +224,9 @@ python3 <this-skill-path>/scripts/aggregate_benchmark.py \
   --out <workspace>/iteration-N/benchmark.json
 ```
 
-`benchmark.json` のスキーマは skill-creator の `references/schemas.md` と同一 (`runs[]` / `run_summary.with_skill` / `run_summary.without_skill` / `delta`)。
+The schema of `benchmark.json` is identical to the skill-creator `references/schemas.md` (`runs[]` / `run_summary.with_skill` / `run_summary.without_skill` / `delta`).
 
-`benchmark.md` も併せて生成して人間が読みやすいテーブルにする:
+Also emit `benchmark.md` as a human-readable table:
 
 ```
 | eval | with pass | without pass | Δ pass | with sec | without sec | Δ tokens |
@@ -234,9 +235,9 @@ python3 <this-skill-path>/scripts/aggregate_benchmark.py \
 
 ---
 
-## Step 6: 統合レポート
+## Step 6: Unified report
 
-`scripts/render_report.py` を使えば `static.json` / `benchmark.json` から `report.md` の骨組みを自動生成できる:
+`scripts/render_report.py` scaffolds `report.md` from `static.json` and `benchmark.json`:
 
 ```bash
 python3 <this-skill-path>/scripts/render_report.py \
@@ -245,18 +246,18 @@ python3 <this-skill-path>/scripts/render_report.py \
   --out <workspace>/iteration-N/report.md
 ```
 
-`--benchmark` は省略可 (static のみのレポートになる)。生成後は verdict と上位修正候補を手で書き足す。
+`--benchmark` is optional (omitting it produces a static-only report). After scaffolding, hand-write the verdict and the top fix candidates.
 
-テンプレを使わず手書きするときの最小形式:
+Minimal manual format:
 
 ```markdown
 # skill-eval report: <skill-name>
 
 ## Verdict
-<one-line: "Ship-ready" / "Needs work" / "Net negative" / "Inconclusive" のいずれか>
+<one-liner: one of "Ship-ready" / "Needs work" / "Net negative" / "Inconclusive">
 
 ## Static (score: <0.0-1.0> / hard_fail: <true|false>)
-- 各 axis の pass/fail と evidence を箇条書き
+- bullet pass/fail with evidence per axis
 
 ## Dynamic
 | metric | with_skill | without_skill | Δ |
@@ -265,57 +266,57 @@ python3 <this-skill-path>/scripts/render_report.py \
 | tokens | 3800 | 2100 | +1700 |
 
 ## Differentiating assertions
-- 各 differentiating assertion text と (eval_name, with_rate, without_rate)
+- each differentiating assertion text with (eval_name, with_rate, without_rate)
 
 ## Top issues to fix
-1. (static 由来 + dynamic 由来の up-to 3 件)
+1. (up to 3 items, mixing static and dynamic sources)
 
 ## Files
 - static.json / benchmark.json / runs/eval-*/{with_skill,without_skill}/outputs/
 ```
 
-verdict は以下のヒューリスティクスで決める (絶対視せず、ユーザーに最終判断を委ねる):
+Verdict heuristics (use as guidance only; the user makes the final call):
 
-- **Ship-ready**: static score ≥ 0.8 かつ pass_rate delta ≥ +0.2
-- **Needs work**: static score 0.5〜0.8 or pass_rate delta が +0.05〜+0.2
-- **Net negative**: pass_rate delta ≤ 0 か、time/tokens がともに 2 倍以上に膨らんでいる
-- **Inconclusive**: 試行数不足や variance が高い (stddev > mean*0.3)
-
----
-
-## ユーザーとの対話
-
-評価作業はそれなりに時間がかかる (subagent 並列で典型 1〜3 分 × prompt 数)。以下を守る:
-
-- **着手前に 1 文で計画を提示**: 「target=X / prompts=3件自動生成 / runs=1 / 推定 90 秒」
-- **dispatch 直後にひとこと**: 「6 個の subagent を launch しました。完了次第 grader に流します」
-- **完了時に report.md を必ず提示**: 単体の数字だけ出すとユーザーは判断できない。verdict と「上位 3 件の修正候補」まで書く
-
-判断を求めるときは AskUserQuestion を使う (テキストで質問しない)。
+- **Ship-ready**: static score ≥ 0.8 and pass_rate delta ≥ +0.2
+- **Needs work**: static score 0.5–0.8 or pass_rate delta in +0.05–+0.2
+- **Net negative**: pass_rate delta ≤ 0, or both time and tokens at least 2× larger
+- **Inconclusive**: too few runs or high variance (stddev > mean × 0.3)
 
 ---
 
-## エッジケース
+## User interaction
 
-- **target_skill_path に SKILL.md がない**: hard fail。プラグインルートを渡された可能性があるので、`skills/*/SKILL.md` を glob して候補を提示する。
-- **evals.json が既存だが assertion が空**: skill-creator と同じく、prompt から提案して合意を取る。
-- **dynamic 層でどちらの構成も pass_rate 0**: prompt が難しすぎる/曖昧すぎる可能性が高い。prompt を見直すべきと report に書く。
-- **with_skill が without_skill に負ける**: skill が逆効果。assertion の質を疑う前に SKILL.md を読み返し、何を強制しているかを確認 (`MUST` で誤った手順を強要しているなど)。
+Evaluation takes real time (subagents in parallel typically 1–3 minutes × number of prompts). Follow these rules:
 
----
+- **Before starting, state the plan in one sentence**: "target=X / prompts=3 auto-generated / runs=1 / ETA ~90 s".
+- **Right after dispatch, say so**: "launched 6 subagents; will pipe results to grader on completion".
+- **Always finish by presenting report.md**: bare numbers don't help — include the verdict and the top 3 fix candidates.
 
-## 拡張案 (未実装)
-
-- skill 単体ではなく **plugin 全体** (`plugin.json` + 配下の commands/agents/hooks/skills) を一括採点
-- description optimization (skill-creator の `run_loop.py` と同思想で trigger eval を回す)
-- 複数 skill を横並びでベンチして leaderboard を吐く
-
-これらは別 skill / 別 plugin として切る方が責務が明確。
+Ask via AskUserQuestion (not free text) whenever a decision is required.
 
 ---
 
-## 参考
+## Edge cases
 
-- claude-code plugin の SKILL.md / frontmatter / progressive disclosure 規約 → claude-plugins-official `skill-creator` の SKILL.md "Writing Style" / "Skill Writing Guide" 節
-- A/B benchmark 手法と JSON スキーマ → claude-plugins-official `skill-creator` の `references/schemas.md`
-- 評価軸の詳細 → `references/eval-axes.md`
+- **No SKILL.md at target_skill_path**: hard fail. The user may have handed you the plugin root — glob `skills/*/SKILL.md` and offer the candidates.
+- **evals.json exists but assertions are empty**: same as skill-creator — propose from the prompts and confirm.
+- **Dynamic layer: pass_rate is 0 on both configurations**: the prompt is likely too hard or too ambiguous. Report says: rework the prompt.
+- **with_skill loses to without_skill**: the skill is net-negative. Before suspecting assertion quality, re-read SKILL.md and check whether it `MUST`-enforces the wrong procedure.
+
+---
+
+## Possible extensions (not implemented)
+
+- Score an entire **plugin** at once (`plugin.json` plus the commands/agents/hooks/skills underneath), rather than a single skill.
+- Description optimization (run trigger evals as skill-creator's `run_loop.py` does).
+- Cross-skill leaderboard.
+
+These have cleaner ownership as separate skills / plugins.
+
+---
+
+## References
+
+- claude-code plugin conventions for SKILL.md / frontmatter / progressive disclosure → the "Writing Style" / "Skill Writing Guide" sections of claude-plugins-official `skill-creator`'s SKILL.md
+- A/B benchmark methodology and JSON schema → claude-plugins-official `skill-creator`'s `references/schemas.md`
+- Axis details → `references/eval-axes.md`

@@ -4,8 +4,8 @@
     {
       "id": 1,
       "name": "global-claude-md-default-flow",
-      "prompt": "うちの ~/.claude/CLAUDE.md がだんだん長くなってきて、複数 section またがって用語ブレてないか・implicit な premise で読み手が詰まらないか心配。9 並列で independent に audit して、≥4/9 が引っかけたものだけ高信頼として扱ってほしい。意図的にこうしてある (= 再 flag されたら困る) ものは以下: (1) 'English Feedback' section は意図的に置いていない、(2) '1-horsepower cap' という比喩表現は意図的、(3) find/grep などを harness では allow しつつ CLAUDE.md では禁止する dual-layer 設計、(4) Tier 3 の dual management (deny rule + Claude 側 self-discipline) も意図的。これらを exclusion list として組み込んで進めてほしい。fix が必要そうな箇所が出たら、1 件ずつ確認させてくれ。",
-      "expected_output": "Phase 1 (inputs)・Phase 1.5 (section purposes) を AskUserQuestion で確認、Phase 2 で 9 subagent を single-message + run_in_background=true で並列 dispatch、Phase 3 で per-instance HIGH count と convergent issues の 2 つの表を提示、Phase 4 で fix candidates と既知 tension を分離、Phase 4.5 false-positive detector → Phase 4.6 default-redundancy-checker → Phase 5 fix drafting → Phase 5.5 fix-safety-checker → Phase 5.6 fix-per-question approval、~/.claude/CLAUDE.md は Claude Code agent config なので Edit が auto-mode classifier で block されたら Phase 6b playbook で対応、Phase 7 re-verify、Phase 8 stop condition。",
+      "prompt": "My ~/.claude/CLAUDE.md keeps getting longer, and I'm worried about terminology drift across sections and implicit premises that may trip up the reader. Please audit it with 9 parallel independent instances and treat only issues flagged by ≥4/9 as high-confidence. The following are intentional and should NOT be re-flagged: (1) the 'English Feedback' section is intentionally omitted, (2) the '1-horsepower cap' metaphor is intentional, (3) the dual-layer design where find/grep are allowed by the harness but forbidden by CLAUDE.md is intentional, (4) the Tier 3 dual management (deny rule + Claude-side self-discipline) is also intentional. Please incorporate these as the exclusion list before proceeding. When you find a fix candidate, confirm with me one at a time.",
+      "expected_output": "Phase 1 (inputs) and Phase 1.5 (section purposes) confirmed via AskUserQuestion; Phase 2 dispatches 9 subagents in a single-message + run_in_background=true; Phase 3 presents two tables (per-instance HIGH count and convergent issues); Phase 4 separates fix candidates from known tensions; Phase 4.5 false-positive-detector → Phase 4.6 default-redundancy-checker → Phase 5 fix drafting → Phase 5.5 fix-safety-checker → Phase 5.6 fix-per-question approval; because ~/.claude/CLAUDE.md is a Claude Code agent config, if Edit is blocked by the auto-mode classifier, follow the Phase 6b playbook; Phase 7 re-verify; Phase 8 stop condition.",
       "files": [],
       "expectations": [
         "The executor identifies that this task triggers the claude-md-parallel-audit skill (not a single-pass review, not claude-md-improver, not revise-claude-md)",
@@ -20,7 +20,7 @@
         "Phase 5 chooses single-proposal vs multi-option drafting based on fix scope (≤3 lines & no structural change → single; substantive → multi-option with trade-off labels)",
         "Phase 5.5 dispatches a fix-safety-checker subagent per fix (or per option in multi-option mode) before presenting to user",
         "Phase 5.6 asks one AskUserQuestion per fix candidate (not batched), with the option set matching the drafting mode",
-        "Because the target is ~/.claude/CLAUDE.md (Claude Code agent config), the executor anticipates Phase 6b auto-mode classifier denial and plans to use the 'はい、update my CLAUDE.md' authorization template if blocked",
+        "Because the target is ~/.claude/CLAUDE.md (Claude Code agent config), the executor anticipates Phase 6b auto-mode classifier denial and plans to use the 'Yes, update my CLAUDE.md' authorization template if blocked",
         "Phase 7 re-verify reuses the Phase 1.5 section purposes (does not re-collect) and updates the exclusion list with anything user added during Phase 5.6",
         "Phase 8 stop conditions are referenced explicitly (all-clean / ≥3 say clean / plateau / max_iterations / 0 fix candidates)",
         "The execution plan does NOT include 'one-shot single-pass audit' or 'I will just review the file myself' or 'I'll write a single critique' — the parallel multi-agent structure is preserved"
@@ -29,8 +29,8 @@
     {
       "id": 2,
       "name": "project-claude-md-light-audit",
-      "prompt": "/Users/tm/development/oss/review-agent/CLAUDE.md がここ最近の追記で section 間の用語ブレてる気がする。本格的に 9 並列まではいらないので、3 instance × ≥2/3 で軽めに parallel audit してくれない? 除外したい意図的設計は特にない、もしあれば指摘してくれていい。max iteration も 3 ぐらいでいい。",
-      "expected_output": "Phase 1 で N=3, threshold=2, max_iterations=3 を AskUserQuestion で確認、exclusions が空であることも明示的に確認、target_file=/Users/tm/development/oss/review-agent/CLAUDE.md、Phase 1.5 section purposes、Phase 2 で 3 subagent を single-message 並列 dispatch、Phase 3 で 3-instance 規模の 2 表を提示、≥2/3 を fix candidate に、Phase 4.5/4.6/5/5.5/5.6 へ。max 3 iteration で stop。",
+      "prompt": "/Users/tm/development/oss/review-agent/CLAUDE.md seems to have terminology drift across sections after recent additions. I don't need the full 9-way parallel run — could you do a lighter parallel audit with 3 instances × ≥2/3 threshold? I don't have any intentional design choices to exclude; if you spot any, you can call them out. max_iterations of 3 is fine.",
+      "expected_output": "Phase 1 confirms N=3, threshold=2, max_iterations=3 via AskUserQuestion and explicitly verifies that exclusions is empty; target_file=/Users/tm/development/oss/review-agent/CLAUDE.md; Phase 1.5 section purposes; Phase 2 dispatches 3 subagents in a single message; Phase 3 presents two tables at 3-instance scale; ≥2/3 issues become fix candidates; then Phase 4.5/4.6/5/5.5/5.6; stop at max 3 iterations.",
       "files": [],
       "expectations": [
         "Phase 1 confirms N=3, threshold=2, max_iterations=3 via AskUserQuestion (parameter override from defaults)",
@@ -47,11 +47,11 @@
     {
       "id": 3,
       "name": "vague-exclusions-followup",
-      "prompt": "global の CLAUDE.md (~/.claude/CLAUDE.md) を multi-agent audit したい。default 設定でいい。除外は『過去 audit で受容済 architectural tensions 全般』ということで。",
-      "expected_output": "Phase 1 で N=9 / threshold=4 / max_iterations=5 を確認、exclusions が曖昧 (『過去受容済 architectural tensions 全般』) なので具体例を listing してもらうための follow-up AskUserQuestion (no plain-text)、user が具体項目を渡したら exclusion list を確定、その後 Phase 1.5 → Phase 2 以降は標準フローで実行。",
+      "prompt": "I want to run a multi-agent audit on the global CLAUDE.md (~/.claude/CLAUDE.md). Default settings are fine. For exclusions, use 'all architectural tensions that prior audits have already accepted'.",
+      "expected_output": "Phase 1 confirms N=9 / threshold=4 / max_iterations=5; because exclusions is vague ('all previously-accepted architectural tensions'), a follow-up AskUserQuestion (no plain-text) asks the user to list concrete items; once the user provides specifics, the exclusion list is finalized; then Phase 1.5 → Phase 2 onward proceed with the standard flow.",
       "files": [],
       "expectations": [
-        "The executor detects that the exclusion description is too vague to act on ('過去受容済 architectural tensions 全般' is not a concrete list)",
+        "The executor detects that the exclusion description is too vague to act on ('all previously-accepted architectural tensions' is not a concrete list)",
         "The executor uses AskUserQuestion (not plain text) to ask the user to enumerate specific exclusions — listing concrete examples like 'find/grep dual-layer design', 'Tier 3 dual management', etc. as a starting point for the user to confirm or revise",
         "The executor does NOT proceed to Phase 2 with an empty or vague exclusion list — it understands that without concrete exclusions, subagents will re-flag intentional design every iteration and convergence will never reach",
         "Once concrete exclusions are confirmed, Phase 1.5 (section purposes) and Phase 2 (9-instance parallel dispatch) proceed with the standard defaults (N=9, threshold=4, max_iterations=5)",

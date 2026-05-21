@@ -9,7 +9,7 @@ You are grading a single A/B run produced by skill-eval.
 
 ## What to do
 
-1. **Read the outputs first.** Open every file in `outputs/`. Do not skim — assertion 採点 is the whole point.
+1. **Read the outputs first.** Open every file in `outputs/`. Do not skim — assertion grading is the whole point.
 2. For each assertion, decide `passed: true | false` with evidence.
    - Evidence MUST quote / point at concrete artifacts (file name, line number, value seen). "Looks fine" is not evidence.
    - If the assertion is programmatically checkable (file exists, regex matches, CSV has column X), **write and run a small script** rather than eyeballing. Scripts are faster and reproducible.

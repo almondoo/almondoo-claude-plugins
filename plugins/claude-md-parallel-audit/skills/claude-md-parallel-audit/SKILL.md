@@ -1,6 +1,6 @@
 ---
 name: claude-md-parallel-audit
-description: Multi-agent parallel audit of CLAUDE.md (or similar instruction files like CLAUDE.local.md, AGENTS.md, GEMINI.md) for HIGH-severity quality issues — missing qualifiers, grammar errors, terminology drift, cross-section logical contradictions, implicit premises, incomplete enumerations, and undefined terms. Dispatches N independent subagents to audit the same file, aggregates findings by reproducibility (≥4/9 default), distinguishes new fixable issues from known architectural tensions the user has accepted, and proposes targeted fixes via AskUserQuestion. Use this skill whenever the user asks to audit / review / verify / check the quality / consistency / integrity of a CLAUDE.md or similar agent instruction file, or mentions "multi-agent audit", "convergence audit", "parallel review", "instruction file 整合性", finding inconsistencies / contradictions / 抜け漏れ in instruction files, or wants high-confidence reproducibility on what's wrong with a long instruction file. Distinct from template-comparison audits (e.g. `claude-md-management:claude-md-improver`) — this skill specifically uses parallel independent audits + reproducibility threshold, not template matching.
+description: Multi-agent parallel audit of CLAUDE.md (or similar instruction files like CLAUDE.local.md, AGENTS.md, GEMINI.md) for HIGH-severity quality issues — missing qualifiers, grammar errors, terminology drift, cross-section logical contradictions, implicit premises, incomplete enumerations, and undefined terms. Dispatches N independent subagents to audit the same file, aggregates findings by reproducibility (≥4/9 default), distinguishes new fixable issues from known architectural tensions the user has accepted, and proposes targeted fixes via AskUserQuestion. Use this skill whenever the user asks to audit / review / verify / check the quality / consistency / integrity of a CLAUDE.md or similar agent instruction file, or mentions "multi-agent audit", "convergence audit", "parallel review", "instruction file consistency", finding inconsistencies / contradictions / omissions in instruction files, or wants high-confidence reproducibility on what's wrong with a long instruction file. Distinct from template-comparison audits (e.g. `claude-md-management:claude-md-improver`) — this skill specifically uses parallel independent audits + reproducibility threshold, not template matching.
 ---
 
 # claude-md-parallel-audit
@@ -18,7 +18,7 @@ This skill implements that workflow end-to-end: setup → parallel dispatch → 
 Trigger this skill when the user:
 
 - Asks to **audit / review / verify / check the quality** of a CLAUDE.md, CLAUDE.local.md, or similar instruction file
-- Wants to find **抜け漏れ・不整合・矛盾・整合性 issues** in a long instruction file
+- Wants to find **omissions / inconsistencies / contradictions / coherence issues** in a long instruction file
 - Mentions **multi-agent audit**, **parallel review**, **convergence audit**, **independent verification**
 - Says the instruction file "feels inconsistent" or "I want a second opinion on this CLAUDE.md"
 - Has already done a single-pass review and wants higher-confidence reproducibility data
@@ -73,8 +73,8 @@ Phase 5.5 (`fix-safety-checker`) needs an explicit baseline of what each section
 Process:
 
 1. Read the target file with Read.
-2. For each top-level heading (`## H2`) and meaningful sub-section (`### H3`), draft a 1-line purpose summary in Japanese based on what the section's rules collectively do.
-3. Present all section purposes as a **batch** to the user via AskUserQuestion. Show the full list in the question description (one section per line: `## section-name → 1 行 purpose`), then ask:
+2. For each top-level heading (`## H2`) and meaningful sub-section (`### H3`), draft a 1-line purpose summary based on what the section's rules collectively do.
+3. Present all section purposes as a **batch** to the user via AskUserQuestion. Show the full list in the question description (one section per line: `## section-name → 1-line purpose`), then ask:
    - "All purposes look right" — proceed
    - "Some need correction — let me revise" — user provides corrections in free text, you re-confirm, then proceed
 4. Store the confirmed purposes as `section_purposes` (a map from section heading → confirmed 1-line purpose). Pass this map to Phase 4.6 (`default-redundancy-checker`) and Phase 5.5 (`fix-safety-checker`).
@@ -248,17 +248,17 @@ Playbook when Edit returns this denial:
 
    ```
    Question:
-     auto-mode classifier が `<target_file>` への Edit を self-modification として block しました。
-     適用したい変更: <1-2 行で before → after の要約>
-     この Edit を `<target_file>` に適用してよいですか?
+     The auto-mode classifier blocked Edit on `<target_file>` as self-modification.
+     Proposed change: <1-2 line before → after summary>
+     May I apply this Edit to `<target_file>`?
 
    Options:
-     - "はい、update my <CLAUDE.md / settings.json / etc.>" — explicit per-file authorization
-     - "L<line_range> のみ update OK" — scope-limited authorization
-     - "やめる (Edit しない)" — abort this specific fix
+     - "Yes, update my <CLAUDE.md / settings.json / etc.>" — explicit per-file authorization
+     - "Only update L<line_range>" — scope-limited authorization
+     - "Cancel (do not Edit)" — abort this specific fix
    ```
 
-   The "はい、update my <file>" phrasing matters — the classifier listens for explicit-authorization patterns, not generic agreement. "OK" or "go ahead" may not release the block.
+   The "Yes, update my <file>" phrasing matters — the classifier listens for explicit-authorization patterns, not generic agreement. "OK" or "go ahead" may not release the block.
 
 3. After explicit authorization, **retry the exact same Edit call**. The classifier releases for the duration of that retry.
 
@@ -280,8 +280,8 @@ Stop and report final state when **any** of these holds:
 
 | Condition | Interpretation |
 |---|---|
-| All N instances report "HIGH 問題なし" | Full convergence — file is clean |
-| ≥3 of N instances report "HIGH 問題なし" | Practical convergence |
+| All N instances report "NO HIGH ISSUES" | Full convergence — file is clean |
+| ≥3 of N instances report "NO HIGH ISSUES" | Practical convergence |
 | HIGH avg plateau for 2 consecutive iterations (avg change < 1) | Structural limit reached — remaining issues are likely architectural tensions |
 | iteration ≥ max_iterations | Hard limit — report current state, flag diminishing returns |
 | 0 fix candidates from Phase 4 | Nothing actionable left |
@@ -354,7 +354,7 @@ The `agents/` directory contains specialized subagent prompts referenced by spec
 - **Main-thread aggregation drift** → quietly downgrading subagent findings during Phase 3 because they "don't feel like defects" defeats the purpose of multi-agent audit. The subagents read in fresh contexts; you read with accumulated session bias. Leave disagreements explicit for the user to resolve.
 - **Refining a redundant rule instead of removing it** → if Phase 4.6 returns REMOVE or SIMPLIFY, Phase 5 should not draft a KEEP-style refinement fix. Honor the classification.
 - **Using single-proposal mode for substantive fixes** → forcing the user into "Apply / Skip / Modify (free text)" for a fix that has 3 valid alternatives wastes their time. Use multi-option mode when the fix is substantive (>3 lines changed, structural change, or genuine choice between approaches).
-- **Retrying auto-mode-blocked Edits blindly** → without explicit AskUserQuestion authorization, the classifier will block every retry. Follow the Phase 6b playbook: stop, ask with the "はい、update my <file>" template, then retry once authorized.
+- **Retrying auto-mode-blocked Edits blindly** → without explicit AskUserQuestion authorization, the classifier will block every retry. Follow the Phase 6b playbook: stop, ask with the "Yes, update my <file>" template, then retry once authorized.
 - **Ignoring `rule_burden_impact: INCREASES_MAJOR`** → adding rules has real cost (context budget, attention dilution, over-cautious behavior). Major increases warrant explicit user scrutiny — surface them in the AskUserQuestion description, do not bury.
 
 ## Cost notes

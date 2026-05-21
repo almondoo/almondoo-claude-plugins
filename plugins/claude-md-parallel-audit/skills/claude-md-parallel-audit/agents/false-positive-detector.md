@@ -25,7 +25,7 @@ You will be given:
    ```
    issue_id: A
    line: 97
-   summary: "L97 同一段落内で `gh issue create` を Tier 2 example と「NOT listed」の双方として記載"
+   summary: "L97 the same paragraph lists `gh issue create` both as a Tier 2 example and as 'NOT listed'"
    instances_flagged: 6/9
    category: (4) section-to-section contradiction
    ```

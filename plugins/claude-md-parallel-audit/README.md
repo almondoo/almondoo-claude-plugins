@@ -34,7 +34,7 @@ enumerations, undefined terms.
 The skill auto-activates when the user asks to **audit / review / verify /
 check the quality** of a CLAUDE.md or similar instruction file, or mentions
 *multi-agent audit*, *convergence audit*, *parallel review*, *instruction file
-整合性*, or wants high-confidence reproducibility on defects in a long
+consistency*, or wants high-confidence reproducibility on defects in a long
 instruction file.
 
 ## Layout

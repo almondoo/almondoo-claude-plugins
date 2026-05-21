@@ -1,61 +1,65 @@
 # almondoo-claude-plugins
 
-A [Claude Code](https://code.claude.com/docs/en/plugins) plugin marketplace published by **almondoo**.
+**almondoo** が公開する [Claude Code](https://code.claude.com/docs/en/plugins) プラグインマーケットプレイス。
 
-This repository is the marketplace itself — the place where individual plugins
-will live as subdirectories under `plugins/`. It is currently a scaffold with
-no plugins yet; entries will be added to `.claude-plugin/marketplace.json` as
-plugins ship.
+このリポジトリはマーケットプレイス本体であり、各プラグインは `plugins/` 配下のサブディレクトリとして管理されます。プラグインのエントリは `.claude-plugin/marketplace.json` で一元管理しています。
 
-## Install the marketplace
+## 収録プラグイン
 
-From Claude Code:
+| プラグイン | 概要 |
+|---|---|
+| [`claude-md-parallel-audit`](plugins/claude-md-parallel-audit) | CLAUDE.md 等の agent 指示ファイルを multi-agent で並列 audit。N 個の subagent を独立に走らせ、再現性 (≥4/9 デフォルト) で issue を絞り込んで fix を提案 |
+| [`configure-github-permissions`](plugins/configure-github-permissions) | `.claude/settings.local.json` 上で `gh` コマンドの permission を 10 カテゴリ × 3 択 (allow / ask / deny) でインタラクティブに設定。破壊的カテゴリ (merge / release / workflow exec / gh api) は deny がデフォルト |
+| [`skill-eval`](plugins/skill-eval) | 任意の Claude Code skill を 2 層 (static 構造採点 + dynamic A/B ベンチ) で評価。with-skill / without-skill を並列実行し、pass rate / 時間 / トークン delta を比較 |
+
+## マーケットプレイスの追加
+
+Claude Code 内で:
 
 ```
 /plugin marketplace add almondoo/almondoo-claude-plugins
 ```
 
-Then browse and install plugins:
+プラグインの閲覧・インストール:
 
 ```
-/plugin                                           # open the Discover UI
+/plugin                                           # Discover UI を開く
 /plugin install <plugin-name>@almondoo-claude-plugins
 ```
 
-To update later:
+後でアップデートする場合:
 
 ```
 /plugin marketplace update almondoo-claude-plugins
 ```
 
-## Repository layout
+## リポジトリ構成
 
 ```
 almondoo-claude-plugins/
 ├── .claude-plugin/
-│   └── marketplace.json     # marketplace manifest (lists every plugin)
-├── plugins/                 # each subdirectory is one plugin
+│   └── marketplace.json     # マーケットプレイスマニフェスト (全プラグインを列挙)
+├── plugins/                 # 各サブディレクトリが 1 プラグイン
 └── LICENSE                  # Apache-2.0
 ```
 
-A new plugin is added as `plugins/<plugin-name>/` and registered as an entry
-in `.claude-plugin/marketplace.json` with `"source": "./plugins/<plugin-name>"`.
+新規プラグインは `plugins/<plugin-name>/` として配置し、`.claude-plugin/marketplace.json` の `"plugins"` 配列に `"source": "./plugins/<plugin-name>"` で登録します。
 
-## Adding a plugin
+## プラグインの追加手順
 
-1. Create the plugin directory:
+1. プラグインディレクトリを作成:
    ```
    plugins/<plugin-name>/
    ├── .claude-plugin/
-   │   └── plugin.json       # name + description (required)
-   ├── skills/               # optional
-   ├── agents/               # optional
-   ├── commands/             # optional
-   ├── hooks/                # optional
-   ├── .mcp.json             # optional
+   │   └── plugin.json       # name + description (必須)
+   ├── skills/               # 任意
+   ├── agents/               # 任意
+   ├── commands/             # 任意
+   ├── hooks/                # 任意
+   ├── .mcp.json             # 任意
    └── README.md
    ```
-2. Register the plugin in `.claude-plugin/marketplace.json` under `"plugins"`:
+2. `.claude-plugin/marketplace.json` の `"plugins"` にエントリを追加:
    ```json
    {
      "name": "<plugin-name>",
@@ -64,17 +68,15 @@ in `.claude-plugin/marketplace.json` with `"source": "./plugins/<plugin-name>"`.
      "version": "0.1.0"
    }
    ```
-3. Validate locally:
+3. ローカル検証:
    ```
    /plugin marketplace add .
    /plugin install <plugin-name>@almondoo-claude-plugins
    /plugin validate .
    ```
 
-See the [Claude Code plugin docs](https://code.claude.com/docs/en/plugins) and
-[marketplace docs](https://code.claude.com/docs/en/plugin-marketplaces) for
-the full manifest reference.
+マニフェストの完全なリファレンスは [Claude Code プラグインドキュメント](https://code.claude.com/docs/en/plugins) および [marketplace ドキュメント](https://code.claude.com/docs/en/plugin-marketplaces) を参照してください。
 
-## License
+## ライセンス
 
 [Apache-2.0](LICENSE)

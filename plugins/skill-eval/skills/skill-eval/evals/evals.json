@@ -4,39 +4,39 @@
     {
       "id": 1,
       "name": "static-only-clean-skill",
-      "prompt": "/Users/tm/development/oss/almondoo-claude-plugins/plugins/configure-github-permissions/skills/configure-github-permissions/ にある skill を静的評価だけで採点して。dynamic 層は不要。レポートを出して。",
-      "expected_output": "static.json + report.md。hard_fail なし、warnings 0〜2 程度、score 0.7 以上が期待値。",
+      "prompt": "Please grade the skill at /Users/tm/development/oss/almondoo-claude-plugins/plugins/configure-github-permissions/skills/configure-github-permissions/ using static evaluation only. The dynamic layer is not needed. Produce a report.",
+      "expected_output": "static.json + report.md. No hard_fail, around 0-2 warnings, expected score 0.7 or higher.",
       "expectations": [
-        "static.json が生成されている",
-        "static.json が canonical schema を持つ (top-level keys に score / hard_fail / warnings / checks / target をすべて含む)",
-        "static.json.score が 0.0〜1.0 の数値で報告されている (Grade A/100点満点のような独自スケールではない)",
-        "static.json.checks が配列で、各要素が axis / passed / severity / evidence フィールドを持つ",
-        "report.md に Static セクションと verdict が含まれている",
-        "hard_fail フラグの値が報告されている",
-        "dynamic 層を skip した旨が report.md に書かれている"
+        "static.json is generated",
+        "static.json follows the canonical schema (top-level keys include all of score / hard_fail / warnings / checks / target)",
+        "static.json.score is reported as a number in 0.0-1.0 (not a custom scale like Grade A or out of 100)",
+        "static.json.checks is an array, and each element has axis / passed / severity / evidence fields",
+        "report.md includes a Static section and a verdict",
+        "The value of the hard_fail flag is reported",
+        "report.md notes that the dynamic layer was skipped"
       ]
     },
     {
       "id": 2,
       "name": "ab-bench-real-skill",
-      "prompt": "claude-md-parallel-audit skill を with/without で A/B 評価して。テストプロンプトは 1 件で良い: 'このリポジトリの CLAUDE.md を audit して'。1 試行ずつで OK。",
-      "expected_output": "benchmark.json + benchmark.md + report.md。with_skill / without_skill 双方の出力が runs/ 下に保存され、pass_rate delta が算出されている。",
+      "prompt": "Run an A/B evaluation of the claude-md-parallel-audit skill (with vs without). One test prompt is enough: 'Audit this repository's CLAUDE.md'. One run per configuration is fine.",
+      "expected_output": "benchmark.json + benchmark.md + report.md. Outputs for both with_skill and without_skill are saved under runs/, and pass_rate delta is computed.",
       "expectations": [
-        "runs/eval-1/with_skill/ と runs/eval-1/without_skill/ が存在する",
-        "benchmark.json に run_summary.delta.pass_rate が含まれている",
-        "differentiating_assertions セクションが (空でも) 存在する",
-        "report.md の verdict が以下のいずれか: Ship-ready / Needs work / Net negative / Inconclusive"
+        "runs/eval-1/with_skill/ and runs/eval-1/without_skill/ both exist",
+        "benchmark.json includes run_summary.delta.pass_rate",
+        "A differentiating_assertions section exists (even if empty)",
+        "report.md verdict is one of: Ship-ready / Needs work / Net negative / Inconclusive"
       ]
     },
     {
       "id": 3,
       "name": "broken-skill-hard-fail",
-      "prompt": "tmp/broken-skill/ という skill ディレクトリを作って (中身は frontmatter 無しの SKILL.md だけ) 評価して。hard_fail を検出して dynamic 層を skip すべき。",
-      "expected_output": "static.json に hard_fail: true。dynamic 層は実行されず、修正案が report.md に書かれる。",
+      "prompt": "Create a skill directory at tmp/broken-skill/ (containing only a SKILL.md with no frontmatter) and evaluate it. It should detect hard_fail and skip the dynamic layer.",
+      "expected_output": "static.json has hard_fail: true. The dynamic layer is not executed, and fix suggestions are written to report.md.",
       "expectations": [
-        "static.json の hard_fail が true",
-        "report.md に修正候補 (frontmatter を追加せよ等) が書かれている",
-        "subagent dispatch が行われていない (runs/ ディレクトリが無いか空)"
+        "hard_fail in static.json is true",
+        "report.md contains fix candidates (e.g., 'add frontmatter')",
+        "No subagent dispatch is performed (runs/ directory does not exist or is empty)"
       ]
     }
   ]
