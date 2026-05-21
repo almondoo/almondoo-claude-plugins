@@ -58,7 +58,29 @@ If you have additional intentional design choices (e.g., a specific section is i
 
 ## Workflow
 
-The skill runs in phases grouped as **Setup → Detect → Triage → Fix → Apply → Verify**, identical in structure to `claude-md-parallel-audit`. The phase numbering is preserved so transferred knowledge applies. SKILL.md-specific changes are noted per phase.
+The skill runs in phases grouped as **Pre-check → Setup → Detect → Triage → Fix → Apply → Verify**, mostly identical in structure to `claude-md-parallel-audit`. The phase numbering is preserved (so transferred knowledge applies), with one SKILL.md-specific addition: **Phase 0** (`skill-eval` pre-audit static check) runs first to de-duplicate structural axes with the prose audit. Other SKILL.md-specific changes are noted per phase.
+
+---
+
+### Pre-check
+
+#### Phase 0: Pre-audit static check (always, when `skill-eval` is available)
+
+Before any subagent dispatch, run `skill-eval`'s `static_check.py` on the target SKILL.md and capture the result. This serves three purposes:
+
+1. **Hard-fail gate** — if the static check returns `hard_fail: true` (e.g., missing frontmatter), abort the audit and surface the static evidence to the user. Multi-agent prose audit on a structurally broken SKILL.md wastes tokens.
+2. **De-duplicates work** — the static_check axes (frontmatter validity, body line count, MUST/NEVER density, emoji, progressive disclosure, reference integrity) cover the structural domain Phase 1's exclusion default #4 already delegates to `skill-eval`. Pre-running and passing the `static.json` to Phase 1 hardens that delegation: auditors get the static result as context and explicitly do not need to re-flag those axes.
+3. **Calibrates Phase 1 defaults** — if the static check reports a short body (≤100 lines), suggest reducing `N` and `threshold` (`N=3`/`threshold=2`) at Phase 1 since prose-defect surface is small. If body is long (>500 lines), keep defaults but flag potential cost (>500k tokens per iteration).
+
+Command shape (executor adapts paths):
+
+```bash
+python3 <skill-eval-path>/scripts/static_check.py <target_skill_dir> --out <workspace>/iteration-0/static.json
+```
+
+`<skill-eval-path>` is the absolute path to the installed `skill-eval` skill directory. If `skill-eval` is not installed, log a one-line warning and proceed to Phase 1 without the static.json input (the audit still works, just without the de-duplication advantage).
+
+The `static.json` is passed to Phase 2 dispatch as additional context inside the `exclusion_list` payload (as a final item: "Structural defects already flagged by skill-eval static_check are out of scope for this audit — see attached static.json").
 
 ---
 
@@ -69,8 +91,8 @@ The skill runs in phases grouped as **Setup → Detect → Triage → Fix → Ap
 Use **AskUserQuestion** to collect:
 
 1. **Target SKILL.md path** (absolute; must end in `SKILL.md`)
-2. **Confirm N / threshold / max_iterations** (default 9 / 4 / 5)
-3. **Exclusions** — present the SKILL.md-specific defaults above as a multi-select with each as a suggested item; let the user deselect any that don't apply, and accept free-text additions for skill-specific intentional design.
+2. **Confirm N / threshold / max_iterations** (default 9 / 4 / 5; suggest `N=3 / threshold=2` if Phase 0 reported a short body)
+3. **Exclusions** — present the SKILL.md-specific defaults above as a multi-select with each as a suggested item; let the user deselect any that don't apply, and accept free-text additions for skill-specific intentional design. If Phase 0 ran successfully, automatically append the static-check delegation as the 5th exclusion item.
 
 If the target path points to a plugin root or a skills directory (not directly to a `SKILL.md`), glob `**/SKILL.md` under it and offer the candidates via AskUserQuestion.
 
@@ -179,19 +201,20 @@ After all Edit calls, briefly confirm what was applied (file list + 1-line descr
 
 #### Phase 7: Re-verify (when iteration < max_iterations and fixes were applied)
 
-Re-dispatch N subagents (same prompt, with updated exclusion list if any were added in Phase 5.6) and repeat Phases 2–4 (and 4.5 / 4.6 if fix candidates re-emerge). Phase 1.5 section purposes are stable across iterations — do not re-collect them unless the user explicitly says the section structure changed.
+Re-dispatch N subagents (same prompt, with updated exclusion list if any were added in Phase 5.6) and repeat Phases 2–4. If Phase 4 produces new fix candidates, run the **full downstream cycle** (Phase 4.5 → 4.6 → 5 → 5.5 → 5.6 → 6) for them just as in iteration 1 — Phase 7 is "re-detect", but every phase from triage through apply still runs for any re-discovered candidates. Phase 1.5 `section_purposes` are stable across iterations and are re-passed as-is to the re-dispatched Phase 4.6 and Phase 5.5 subagents — do not re-collect them unless the user explicitly says the section structure changed.
 
 #### Phase 8: Stop condition check (always after each iteration)
 
-Identical to `claude-md-parallel-audit` Phase 8:
+Mostly identical to `claude-md-parallel-audit` Phase 8, plus one SKILL.md-specific criterion at the bottom (`skill-eval` score full):
 
 | Condition | Interpretation |
 |---|---|
 | All N instances report "NO HIGH ISSUES" | Full convergence — SKILL.md is clean |
-| ≥3 of N instances report "NO HIGH ISSUES" | Practical convergence |
+| At least `(N − threshold + 1)` instances report "NO HIGH ISSUES" (default: ≥6 of 9 when N=9 / threshold=4) | Practical convergence — even if every remaining instance flagged the same issue, it could not reach `threshold` so no reproducible defect can remain |
 | HIGH avg plateau for 2 consecutive iterations (avg change < 1) | Structural limit reached — remaining issues are likely deliberate design |
 | iteration ≥ max_iterations | Hard limit — report current state, flag diminishing returns |
 | 0 fix candidates from Phase 4 | Nothing actionable left |
+| Phase 0 `skill-eval` re-run reports `score = 1.0` AND `warnings = 0` (SKILL.md-specific) | Structurally ship-ready: re-run static_check after the iteration's Edits; if it now returns a perfect score, the SKILL.md has crossed `skill-eval`'s static bar. Combined with practical convergence from the prose audit above, this signals the SKILL.md is in good shape on both layers |
 
 Report the iteration history (Phase 3 tables across all iterations) so the user can see the trajectory.
 
@@ -213,7 +236,7 @@ After all iterations complete, present a final report with the same structure as
 | Iteration | HIGH avg | Convergent issues | Fixes applied | Status |
 |---|---|---|---|---|
 | 1 | 7.7 | 6 | 1 | continued |
-| 2 | 2.1 | 0 | 0 | converged (≥3/9 said clean) |
+| 2 | 0.4 | 0 | 0 | converged (≥6/9 said clean — practical convergence at N=9/threshold=4) |
 
 ### Fixes applied
 - (line range) before → after — 1-sentence rationale
@@ -253,8 +276,12 @@ After all iterations complete, present a final report with the same structure as
 - **Confusing this skill with `skill-eval`** → skill-eval scores structure + runs A/B benchmarks; this skill finds prose defects via multi-agent convergence. The two are complementary, not substitutes
 - **Treating cross-skill references as automatic defects** → if the SKILL.md inlines the load-bearing content AND points to the canonical source as a courtesy, that is not a defect. Only "the load-bearing content is only available externally with no resolution path" is REAL
 
-## Cost notes
+## Cost notes (measured on real runs, see `evals/` workspace history)
 
-- One N=9 iteration on a ~300-line SKILL.md typically runs ~200-300k tokens (auditors at sonnet ≈ 30k each × 9 + Phase 4.5/4.6/5.5 verifiers at parent model ≈ 30-50k each)
-- A 5-iteration audit can consume ~1-1.5M tokens. Surface this at Phase 1
-- The cost is justified when the SKILL.md is high-leverage (triggered frequently, drives downstream subagent behavior) and the defects compound over time. For a 50-line SKILL.md, run with N=3 / threshold=2 instead
+- **Single N=9 iteration on a ~360-line SKILL.md**: ~440k tokens total — Phase 2 auditors at sonnet ≈ 290k (9 × ~32k), Phase 4.5/4.6 verifiers at parent model ≈ 60k (2 × ~30k), Phase 5.5 safety-checker(s) at parent model ≈ 30-90k (1-3 fixes × ~30k each). Cost grows linearly with the number of REAL fix candidates that survive Phase 4.5/4.6.
+- **5-iteration audit**: ~1.5-2M tokens depending on how many fix candidates surface each iteration. Surface this estimate at Phase 1 so the user can downsize N if needed.
+- **Body-size based N recommendation** (Phase 0 auto-suggests these at Phase 1 confirmation):
+  - body ≤ 100 lines: `N=3 / threshold=2` (~140k tokens / iteration)
+  - body 100-500 lines: `N=9 / threshold=4` (default, ~440k tokens / iteration)
+  - body > 500 lines: keep `N=9` but flag the cost; consider splitting the SKILL.md into a thin SKILL.md + references/ files (progressive disclosure) and auditing each separately
+- The cost is justified when the SKILL.md is high-leverage (triggered frequently, drives downstream subagent behavior) and the defects compound across many invocations. For a one-off / private SKILL.md, prose audit is overkill — `skill-eval`'s static layer alone is sufficient.

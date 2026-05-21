@@ -23,7 +23,7 @@
         {"text": "Phase 5.6 asks one AskUserQuestion per fix candidate (not batched), with the option set matching the drafting mode", "kind": "behavioral"},
         {"text": "Phase 6 applies approved Edits to the SKILL.md (and to any same-skill artifacts like references/eval-axes.md or scripts/render_report.py that the fix-safety-checker flagged as requiring synchronized updates)", "kind": "behavioral"},
         {"text": "Phase 7 re-verify reuses the Phase 1.5 section purposes (does not re-collect) and updates the exclusion list with anything user added during Phase 5.6", "kind": "behavioral"},
-        {"text": "Phase 8 stop conditions are referenced explicitly (all-clean / ≥3 say clean / plateau / max_iterations / 0 fix candidates)", "kind": "behavioral"}
+        {"text": "Phase 8 stop conditions are referenced explicitly (all-clean / ≥(N−threshold+1) say clean (default ≥6/9 when N=9/threshold=4) / plateau / max_iterations / 0 fix candidates)", "kind": "behavioral"}
       ]
     },
     {

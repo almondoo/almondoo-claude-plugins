@@ -272,7 +272,7 @@ This playbook applies per-fix, not per-session. Each blocked Edit needs its own 
 
 #### Phase 7: Re-verify (when iteration < max_iterations and fixes were applied)
 
-Re-dispatch N subagents (same prompt, including updated exclusion list if any were added during Phase 5.6) and repeat Phases 2-4 (and Phase 4.5 + 4.6 if fix candidates re-emerge). Phase 1.5 section purposes are stable across iterations — do not re-collect them unless the user explicitly says the section structure changed.
+Re-dispatch N subagents (same prompt, including updated exclusion list if any were added during Phase 5.6) and repeat Phases 2-4. If Phase 4 produces new fix candidates, run the **full downstream cycle** (Phase 4.5 → 4.6 → 5 → 5.5 → 5.6 → 6) for them just as in iteration 1 — Phase 7 is "re-detect", but every phase from triage through apply still runs for any re-discovered candidates. Phase 1.5 `section_purposes` are stable across iterations and are re-passed as-is to the re-dispatched Phase 4.6 and Phase 5.5 subagents — do not re-collect them unless the user explicitly says the section structure changed.
 
 #### Phase 8: Stop condition check (always after each iteration)
 
@@ -281,7 +281,7 @@ Stop and report final state when **any** of these holds:
 | Condition | Interpretation |
 |---|---|
 | All N instances report "NO HIGH ISSUES" | Full convergence — file is clean |
-| ≥3 of N instances report "NO HIGH ISSUES" | Practical convergence |
+| At least `(N − threshold + 1)` instances report "NO HIGH ISSUES" (default: ≥6 of 9 when N=9 / threshold=4) | Practical convergence — even if every remaining instance flagged the same issue, it could not reach `threshold` so no reproducible defect can remain |
 | HIGH avg plateau for 2 consecutive iterations (avg change < 1) | Structural limit reached — remaining issues are likely architectural tensions |
 | iteration ≥ max_iterations | Hard limit — report current state, flag diminishing returns |
 | 0 fix candidates from Phase 4 | Nothing actionable left |
@@ -306,7 +306,7 @@ After all iterations complete, present a final report with this structure:
 | Iteration | HIGH avg | Convergent issues | Fixes applied | Status |
 |---|---|---|---|---|
 | 1 | 5.6 | 2 | 2 | continued |
-| 2 | 2.1 | 0 | 0 | converged (≥3/9 said clean) |
+| 2 | 0.4 | 0 | 0 | converged (≥6/9 said clean — practical convergence at N=9/threshold=4) |
 
 ### Fixes applied
 - (line range) before → after — 1-sentence rationale

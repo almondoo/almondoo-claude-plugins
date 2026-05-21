@@ -22,7 +22,7 @@
         {"text": "Phase 5.6 asks one AskUserQuestion per fix candidate (not batched), with the option set matching the drafting mode", "kind": "behavioral"},
         {"text": "Because the target is ~/.claude/CLAUDE.md (Claude Code agent config), the executor anticipates Phase 6b auto-mode classifier denial and plans to use the 'Yes, update my CLAUDE.md' authorization template if blocked", "kind": "behavioral"},
         {"text": "Phase 7 re-verify reuses the Phase 1.5 section purposes (does not re-collect) and updates the exclusion list with anything user added during Phase 5.6", "kind": "behavioral"},
-        {"text": "Phase 8 stop conditions are referenced explicitly (all-clean / ≥3 say clean / plateau / max_iterations / 0 fix candidates)", "kind": "behavioral"},
+        {"text": "Phase 8 stop conditions are referenced explicitly (all-clean / ≥(N−threshold+1) say clean (default ≥6/9 when N=9/threshold=4) / plateau / max_iterations / 0 fix candidates)", "kind": "behavioral"},
         {"text": "The execution plan does NOT include 'one-shot single-pass audit' or 'I will just review the file myself' or 'I'll write a single critique' — the parallel multi-agent structure is preserved", "kind": "behavioral"}
       ]
     },
