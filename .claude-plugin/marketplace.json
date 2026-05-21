@@ -16,6 +16,14 @@
       "version": "0.1.0",
       "category": "productivity",
       "keywords": ["claude-md", "audit", "multi-agent", "parallel", "review"]
+    },
+    {
+      "name": "configure-github-permissions",
+      "description": "Interactively configure GitHub CLI (gh) permissions in .claude/settings.local.json via 10 categories × 3 choices (allow / ask / deny). Destructive categories (merge, release, workflow exec, gh api) default to deny.",
+      "source": "./plugins/configure-github-permissions",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": ["gh", "github-cli", "permissions", "settings", "allowlist"]
     }
   ]
 }

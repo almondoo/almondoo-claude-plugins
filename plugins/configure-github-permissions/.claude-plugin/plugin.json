@@ -1,0 +1,19 @@
+{
+  "name": "configure-github-permissions",
+  "description": "Interactively configure GitHub CLI (gh) permissions in the project's .claude/settings.local.json by asking the user category-by-category (10 categories × 3 choices: allow / ask / deny) which gh operation groups should be auto-allowed, prompt-on-use, or auto-denied. Destructive categories (merge, release, workflow exec, gh api) default to deny. Preserves existing entries, dedupes additions, and surfaces cross-array conflicts before writing.",
+  "version": "0.1.0",
+  "author": {
+    "name": "almondoo"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/almondoo/almondoo-claude-plugins",
+  "homepage": "https://github.com/almondoo/almondoo-claude-plugins/tree/main/plugins/configure-github-permissions",
+  "keywords": [
+    "gh",
+    "github-cli",
+    "permissions",
+    "settings",
+    "allowlist",
+    "fewer-prompts"
+  ]
+}

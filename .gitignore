@@ -11,6 +11,9 @@
 tmp/
 .worktrees/
 
+# Personal Claude Code instructions (not shared)
+CLAUDE.local.md
+
 # Node
 node_modules/
 npm-debug.log*
