@@ -13,17 +13,29 @@
       "name": "claude-md-parallel-audit",
       "description": "Multi-agent parallel audit of CLAUDE.md and similar agent-instruction files. Dispatches N independent subagents, aggregates findings by reproducibility (≥4/9 default), and proposes targeted fixes.",
       "source": "./plugins/claude-md-parallel-audit",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
-      "keywords": ["claude-md", "audit", "multi-agent", "parallel", "review"]
+      "keywords": [
+        "claude-md",
+        "audit",
+        "multi-agent",
+        "parallel",
+        "review"
+      ]
     },
     {
       "name": "configure-github-permissions",
       "description": "Interactively configure GitHub CLI (gh) permissions in .claude/settings.local.json via 10 categories × 3 choices (allow / ask / deny). Destructive categories (merge, release, workflow exec, gh api) default to deny.",
       "source": "./plugins/configure-github-permissions",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
-      "keywords": ["gh", "github-cli", "permissions", "settings", "allowlist"]
+      "keywords": [
+        "gh",
+        "github-cli",
+        "permissions",
+        "settings",
+        "allowlist"
+      ]
     },
     {
       "name": "skill-eval",
@@ -31,7 +43,14 @@
       "source": "./plugins/skill-eval",
       "version": "0.1.3",
       "category": "productivity",
-      "keywords": ["skill", "eval", "benchmark", "ab-test", "skill-quality", "with-without-skill"]
+      "keywords": [
+        "skill",
+        "eval",
+        "benchmark",
+        "ab-test",
+        "skill-quality",
+        "with-without-skill"
+      ]
     }
   ]
 }

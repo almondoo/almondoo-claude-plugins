@@ -9,7 +9,7 @@ description: Interactively configure GitHub CLI (gh) permissions in the project'
 
 A skill that configures `gh` command permissions in the project's `.claude/settings.local.json` at **per-category granularity**. It walks the user through 10 categories × 3 choices (`allow` / `ask` / `deny`) via AskUserQuestion and routes each answer into `permissions.allow` / `permissions.ask` / `permissions.deny`.
 
-**Why category-grained?** To support real-world policies like *"auto-allow all read-only operations, but explicitly deny irreversible operations such as close / merge / release."* A coarse tier-based selector cannot express this — choosing `allow` for the read tier would also fix the behavior of the comment tier. This skill lets the user decide each category independently.
+**Why category-grained?** To support real-world policies like *"auto-allow all read-only operations, but explicitly deny irreversible operations such as close / merge / release."* A coarse tier-based selector cannot express this — choosing `allow` for the read tier would also force the same setting on the comment tier. This skill lets the user decide each category independently.
 
 **Design principles:**
 - Each category accepts one of `allow` (auto-execute), `ask` (prompt every time), `deny` (auto-block).
@@ -76,7 +76,7 @@ Bash(gh issue close:*)
 Bash(gh issue reopen:*)
 ```
 
-`gh issue close` is listed in the global CLAUDE.md Tier 3 rule as a "destructive / irreversible write to external systems". Closing fires external notifications (email / Slack integrations / GitHub Actions triggers) that reach every subscriber, making it effectively unretractable. The default is `deny`. Repositories that use issues as an internal task tracker (e.g. `almondoo/review-agent`) should override this on a per-repository basis via their CLAUDE.md. `reopen` is not destructive on its own, but pairing it with `close` keeps the operational policy simple.
+`gh issue close` is listed in the global CLAUDE.md Tier 3 rule as a "destructive / irreversible write to external systems". Closing fires external notifications (email / Slack integrations / GitHub Actions triggers) that reach every subscriber, making it effectively unretractable. The default is `deny`. Repositories that use issues as an internal task tracker (where the close notification is low-stakes) can override this on a per-repository basis via their CLAUDE.md. `reopen` is not destructive on its own, but pairing it with `close` keeps the operational policy simple.
 
 ### Cat 6 — PR create / edit: PR creation and editing (recommended: ask)
 
@@ -93,7 +93,7 @@ Bash(gh pr merge:*)
 Bash(gh pr close:*)
 ```
 
-Falls under global CLAUDE.md Tier 3. Merges are effectively irreversible and `close` fires notifications. Default to `deny`.
+These commands fall under global CLAUDE.md Tier 3. Merges are effectively irreversible and `close` fires notifications. The default is `deny`.
 
 ### Cat 8 — Release ops: Release creation, editing, and deletion (recommended: deny)
 
@@ -134,7 +134,7 @@ That said, there are legitimate GET-only use cases that **only** `gh api` can co
 
 Therefore a blanket `deny` would stop everyday read tasks like PR review tracking and issue metadata retrieval. The default is **`ask`**, with the operational expectation that the user visually verifies the endpoint and method at invocation time.
 
-If `ask` becomes noisy, the recommended approach is to add **path-scoped allow rules for specific GET endpoints** the user hits frequently (e.g. `Bash(gh api repos/{owner}/{repo}/pulls/* /comments)`). The skill cannot ship such rules as defaults; the user adds them manually.
+If `ask` becomes noisy, the recommended approach is to add **path-scoped allow rules for specific GET endpoints** the user hits frequently (e.g. `Bash(gh api repos/{owner}/{repo}/pulls/*/comments)`). The skill cannot ship such rules as defaults; the user adds them manually.
 
 ## Step-by-step
 

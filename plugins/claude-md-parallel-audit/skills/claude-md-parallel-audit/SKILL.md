@@ -133,7 +133,7 @@ For each convergent issue (count ≥ threshold), categorize:
 - **Acceptable**: Matches an exclusion the user provided → note and skip
 - **Below threshold**: count < threshold → note in the table but do not propose a fix
 
-If 0 fix candidates remain, jump to Phase 7 (convergence reached).
+If 0 fix candidates remain, skip Phases 4.5–6 and go directly to Phase 8 (stop condition check) — there is nothing to re-verify in Phase 7 because no fixes were applied this iteration.
 
 #### Phase 4.5: False-positive detection (when fix candidates exist)
 
@@ -260,7 +260,7 @@ Playbook when Edit returns this denial:
 
    The "Yes, update my <file>" phrasing matters — the classifier listens for explicit-authorization patterns, not generic agreement. "OK" or "go ahead" may not release the block.
 
-3. After explicit authorization, **retry the exact same Edit call**. The classifier releases for the duration of that retry.
+3. After explicit authorization, **retry the exact same Edit call**. The classifier releases for that single retry only; subsequent Edits on the same file need their own authorization.
 
 4. If the retry also fails (rare), surface the error to the user and ask whether to skip the fix or have the user apply it manually.
 

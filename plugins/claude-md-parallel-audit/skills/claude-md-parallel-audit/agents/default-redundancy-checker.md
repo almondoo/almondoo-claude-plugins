@@ -79,6 +79,6 @@ Return a markdown table:
 - **Do not draft the actual fix.** Phase 5 owns drafting. Your `suggested_action_if_simplify_or_remove` is a hint for Phase 5, not a finalized fix.
 - **Lean toward KEEP when uncertain.** A wrongly-removed load-bearing rule degrades all future sessions; a wrongly-kept redundant rule wastes a small amount of context. Asymmetric cost.
 - **Cite the specific default behavior** you believe duplicates the rule. Vague "I think this is a default" is not useful. Quote or paraphrase the relevant default rule.
-- **Mark unverified claims explicitly.** Per the user's Forthright Assessment rule (L76 of their CLAUDE.md): use "I am inferring" / "I have not verified" when you cannot point to a documented default.
+- **Mark unverified claims explicitly.** Per the user's "Forthright Assessment" section in `~/.claude/CLAUDE.md`: use "I am inferring" / "I have not verified" when you cannot point to a documented default.
 - **Do not re-audit the file.** Only assess the issues passed in.
 - **Do not assess `section_purposes` correctness.** Take them as given — they represent the user's confirmed intent. Use them only to disambiguate which rules in a section are load-bearing.
