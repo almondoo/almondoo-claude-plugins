@@ -1,0 +1,20 @@
+{
+  "name": "skill-eval",
+  "description": "Evaluate any Claude Code skill on two layers: (1) static quality scoring derived from claude-code plugin conventions (frontmatter validity, body length, progressive disclosure, description triggerability) and (2) dynamic A/B benchmarking that runs the same prompts in parallel subagents with-skill vs without-skill and compares pass rate, time, and tokens. Produces a markdown report plus benchmark.json.",
+  "version": "0.1.2",
+  "author": {
+    "name": "almondoo"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/almondoo/almondoo-claude-plugins",
+  "homepage": "https://github.com/almondoo/almondoo-claude-plugins/tree/main/plugins/skill-eval",
+  "keywords": [
+    "skill",
+    "eval",
+    "benchmark",
+    "ab-test",
+    "skill-quality",
+    "with-without-skill",
+    "claude-code-plugin"
+  ]
+}

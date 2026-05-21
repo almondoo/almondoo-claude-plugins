@@ -24,6 +24,14 @@
       "version": "0.1.0",
       "category": "productivity",
       "keywords": ["gh", "github-cli", "permissions", "settings", "allowlist"]
+    },
+    {
+      "name": "skill-eval",
+      "description": "Evaluate any Claude Code skill on two layers: (1) static structural quality scoring derived from claude-code plugin conventions (frontmatter validity, body length, progressive disclosure, description triggerability) and (2) dynamic A/B benchmarking that runs the same prompts in parallel subagents with-skill vs without-skill and compares pass rate, time, and tokens.",
+      "source": "./plugins/skill-eval",
+      "version": "0.1.2",
+      "category": "productivity",
+      "keywords": ["skill", "eval", "benchmark", "ab-test", "skill-quality", "with-without-skill"]
     }
   ]
 }
