@@ -2,14 +2,18 @@
 
 CLAUDE.md (および `CLAUDE.local.md` / `AGENTS.md` / `GEMINI.md` などの同種のエージェント指示ファイル) を **複数エージェントで並列に監査** し、**HIGH 重大度** の品質問題を洗い出します。検出対象は、修飾語の欠落・文法ミス・用語ゆれ・セクション間の論理矛盾・暗黙の前提・列挙漏れ・未定義語など。
 
-## 仕組み
+## 何をどの順番で行うか
 
-1. 同じファイルに対して **N 個の独立したサブエージェント** (既定 `N=9`) を投入して監査する。
-2. **再現性** で findings を集約 — **N のうち K 個以上** (既定 `K=4`) で報告された問題のみを真のシグナルとして採用する。単発の検出はノイズとして破棄。
-3. 結果を以下にトリアージする:
-   - **修正可能な新規欠陥** — `AskUserQuestion` で具体的な修正案を提示。
-   - **ユーザーが既に許容している構造的トレードオフ** — 別枠で列挙。
-4. 収束 (K 回以上再現する HIGH 重大度の新規問題が出なくなる) まで反復、上限は `max_iter` ラウンド。
+収束するか `max_iterations` (既定 `5`) に達するまで以下を反復:
+
+1. **Phase 1**: 対象ファイルパス / `N` / `threshold` / `max_iterations` / 除外リストを `AskUserQuestion` で収集 (既定 `N=9` / `threshold=4` / `max_iterations=5`)
+2. **Phase 1.5**: 各セクションの 1 行目的を draft → batch confirm (`fix-safety-checker` の intent baseline)
+3. **Phase 2**: N 並列 `auditor` を `model: "sonnet"` で同一 turn dispatch (HIGH 重大度を最大 10 件/instance)
+4. **Phase 3**: per-instance HIGH count + convergent issues (≥ threshold) の 2 表を生成
+5. **Phase 4 / 4.5 / 4.6**: triage → `false-positive-detector` (REAL / FALSE / NEEDS_HUMAN) → `default-redundancy-checker` (Claude Code default と被るか、KEEP / SIMPLIFY / REMOVE)
+6. **Phase 5 / 5.5 / 5.6**: fix draft (single / multi-option) → `fix-safety-checker` (SAFE / NEEDS_REVIEW / UNSAFE) → `AskUserQuestion` で 1 件ずつ承認
+7. **Phase 6**: `Edit` で適用 (エージェント設定ファイルが auto-mode classifier に拒否されたら明示認可を得て単発リトライ)
+8. **Phase 7 / 8**: Phase 2 から再ディスパッチ → 収束判定 (全 N が clean / `(N − threshold + 1)` 以上が clean / HIGH 平均プラトー / max_iter / fix candidate 0)
 
 ## インストール
 
