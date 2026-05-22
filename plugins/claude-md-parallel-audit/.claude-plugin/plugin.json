@@ -1,7 +1,7 @@
 {
   "name": "claude-md-parallel-audit",
   "description": "Multi-agent parallel audit of CLAUDE.md (or similar agent-instruction files such as CLAUDE.local.md, AGENTS.md, GEMINI.md) for HIGH-severity quality issues. Dispatches N independent subagents, aggregates findings by reproducibility (≥4/9 default), distinguishes new fixable defects from already-accepted architectural tensions, and proposes targeted fixes.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "almondoo"
   },

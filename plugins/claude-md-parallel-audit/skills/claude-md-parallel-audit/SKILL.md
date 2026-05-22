@@ -133,7 +133,7 @@ For each convergent issue (count ≥ threshold), categorize:
 - **Acceptable**: Matches an exclusion the user provided → note and skip
 - **Below threshold**: count < threshold → note in the table but do not propose a fix
 
-If 0 fix candidates remain, skip Phases 4.5–6 and go directly to Phase 8 (stop condition check) — there is nothing to re-verify in Phase 7 because no fixes were applied this iteration.
+If 0 fix candidates remain, skip Phases 4.5, 4.6, 5, 5.5, 5.6, 6a, 6b, and 7 — go directly to Phase 8 (stop condition check). Phase 7 is bypassed because no fixes were applied this iteration.
 
 #### Phase 4.5: False-positive detection (when fix candidates exist)
 
@@ -272,7 +272,7 @@ This playbook applies per-fix, not per-session. Each blocked Edit needs its own 
 
 #### Phase 7: Re-verify (when iteration < max_iterations and fixes were applied)
 
-Re-dispatch N subagents (same prompt, including updated exclusion list if any were added during Phase 5.6) and repeat Phases 2-4. If Phase 4 produces new fix candidates, run the **full downstream cycle** (Phase 4.5 → 4.6 → 5 → 5.5 → 5.6 → 6) for them just as in iteration 1 — Phase 7 is "re-detect", but every phase from triage through apply still runs for any re-discovered candidates. Phase 1.5 `section_purposes` are stable across iterations and are re-passed as-is to the re-dispatched Phase 4.6 and Phase 5.5 subagents — do not re-collect them unless the user explicitly says the section structure changed.
+Re-dispatch N subagents (same prompt, including updated exclusion list if any were added during Phase 5.6) and repeat Phases 2-4. If Phase 4 produces new fix candidates, run the **full downstream cycle** (Phase 4.5 → 4.6 → 5 → 5.5 → 5.6 → 6a → 6b) for them just as in iteration 1 — Phase 7 is "re-detect", but every phase from triage through apply still runs for any re-discovered candidates. Phase 1.5 `section_purposes` are stable across iterations and are re-passed as-is to the re-dispatched Phase 4.6 and Phase 5.5 subagents — do not re-collect them unless the user explicitly says the section structure changed.
 
 #### Phase 8: Stop condition check (always after each iteration)
 
@@ -312,7 +312,7 @@ After all iterations complete, present a final report with this structure:
 - (line range) before → after — 1-sentence rationale
 - ...
 
-### Remaining known tensions (carried over to exclusion list)
+### Remaining accepted exclusions (carried over)
 - ...
 
 ### Recommendation
@@ -323,7 +323,7 @@ After all iterations complete, present a final report with this structure:
 
 | Tool | Use |
 |---|---|
-| `Agent` | Parallel subagent dispatch (Phase 2 audit, Phase 4.5 false-positive detection, Phase 4.6 default redundancy check, Phase 5.5 fix safety check). Use `run_in_background: true` for Phase 2 (N parallel auditors); Phases 4.5 / 4.6 / 5.5 single-agent dispatches can be foreground since they gate the next phase |
+| `Agent` | Parallel subagent dispatch (Phase 2 audit, Phase 4.5 false-positive detection, Phase 4.6 default redundancy check, Phase 5.5 fix safety check). Use `run_in_background: true` for Phase 2 (N parallel auditors); Phase 4.5 / 4.6 (1 subagent each) can be foreground; Phase 5.5 dispatches 1 per fix candidate (or 1 per option in multi-option mode) — keep foreground since each safety-check gates Phase 5.6 user approval, but spawn the per-fix/per-option safety-checkers in parallel within one tool-call message |
 | `Read` | Phase 1.5 (read target file to draft section purposes); verify line numbers before proposing fixes; read `agents/*.md` files when dispatching specialized subagents |
 | `AskUserQuestion` | Phase 1 setup, Phase 1.5 section purpose confirmation, Phase 5.6 fix approval, Phase 6b auto-mode classifier authorization — never use plain text questions per CLAUDE.md communication rule |
 | `Edit` | Apply approved fixes; if blocked by auto-mode classifier, follow Phase 6b playbook |

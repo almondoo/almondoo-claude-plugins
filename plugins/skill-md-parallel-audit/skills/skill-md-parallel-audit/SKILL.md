@@ -40,7 +40,7 @@ Defaults shown. The skill should ask the user to confirm or override these at Ph
 | `N` | 9 | Number of parallel subagents to dispatch per iteration |
 | `threshold` | 4 | Minimum instances that must flag an issue for it to be considered reproducible (≥4/9 ≈ 44%) |
 | `max_iterations` | 5 | Hard upper bound on audit→fix→verify cycles |
-| `target_file` | (asked) | Absolute path to the SKILL.md to audit (e.g. `plugins/foo/skills/foo/SKILL.md`) |
+| `target_file` | (asked) | Absolute path to the SKILL.md to audit (e.g. `/Users/me/repo/plugins/foo/skills/foo/SKILL.md`) |
 | `related_files` | (drafted) | Files in `agents/` / `references/` / `scripts/` / `evals/` under the same skill directory — used for cross-reference integrity checks (the orchestrator can glob these) |
 | `exclusions` | (asked, with SKILL.md-specific defaults pre-loaded) | Items the user does NOT want re-flagged (see below) |
 | `section_purposes` | (drafted then asked in Phase 1.5) | Map from each section heading to its 1-line purpose; established once per audit and reused across iterations |
@@ -80,7 +80,7 @@ python3 <skill-eval-path>/scripts/static_check.py <target_skill_dir> --out <work
 
 `<skill-eval-path>` is the absolute path to the installed `skill-eval` skill directory. If `skill-eval` is not installed, log a one-line warning and proceed to Phase 1 without the static.json input (the audit still works, just without the de-duplication advantage).
 
-The `static.json` is passed to Phase 2 dispatch as additional context inside the `exclusion_list` payload (as a final item: "Structural defects already flagged by skill-eval static_check are out of scope for this audit — see attached static.json").
+Phase 1 then appends a reference to this `static.json` as the 5th exclusion item (see Phase 1 step 3) so Phase 2 auditors receive the file path and can Read the static results when verifying a specific axis.
 
 ---
 
@@ -92,7 +92,7 @@ Use **AskUserQuestion** to collect:
 
 1. **Target SKILL.md path** (absolute; must end in `SKILL.md`)
 2. **Confirm N / threshold / max_iterations** (default 9 / 4 / 5; suggest `N=3 / threshold=2` if Phase 0 reported a short body)
-3. **Exclusions** — present the SKILL.md-specific defaults above as a multi-select with each as a suggested item; let the user deselect any that don't apply, and accept free-text additions for skill-specific intentional design. If Phase 0 ran successfully, automatically append the static-check delegation as the 5th exclusion item.
+3. **Exclusions** — present the SKILL.md-specific defaults above as a multi-select with each as a suggested item; let the user deselect any that don't apply, and accept free-text additions for skill-specific intentional design. If Phase 0 ran successfully, automatically append a 5th exclusion item with this literal text: "Structural defects already flagged by skill-eval static_check are out of scope for this audit — see `<workspace>/iteration-0/static.json` for the per-axis results. Auditors that want to verify a specific axis Read the file path; do not re-flag axes covered by the static_check."
 
 If the target path points to a plugin root or a skills directory (not directly to a `SKILL.md`), glob `**/SKILL.md` under it and offer the candidates via AskUserQuestion.
 
@@ -191,9 +191,17 @@ Identical to `claude-md-parallel-audit` Phase 5.6. One AskUserQuestion per fix c
 
 #### Phase 6: Apply via Edit
 
-Use **Edit** to apply approved fixes. SKILL.md files do NOT typically trip the auto-mode classifier ("Self-modification of agent config") because they are plugin artifacts, not Claude Code's own config files. If a fix would synchronize a script (e.g., `render_report.py`) or a references doc in the same skill, apply those Edits as part of the same approved fix — Phase 5.5's verdict scope covers same-PR follow-ups.
+Use **Edit** to apply approved fixes. **Location qualifier**: a SKILL.md in a plugin's *source* directory (e.g. `plugins/<name>/skills/<name>/SKILL.md` in a marketplace repo) is a plugin artifact and does NOT trip the auto-mode classifier. A SKILL.md *installed* under `.claude/skills/*` (per the user's CLAUDE.md Tier 2 list) IS Claude Code agent config and WILL trip the classifier — for that case, follow the auto-mode authorization template documented in `claude-md-parallel-audit`'s Phase 6b before re-trying the Edit. If a fix would synchronize a script (e.g., `render_report.py`) or a references doc in the same skill, apply those Edits as part of the same approved fix — Phase 5.5's verdict scope covers same-PR follow-ups.
 
 After all Edit calls, briefly confirm what was applied (file list + 1-line description per fix).
+
+#### Phase 6.5: Post-fix static re-check (only if Phase 0 ran)
+
+If Phase 0 produced a baseline `static.json`, re-execute the same `skill-eval` command with the output redirected to `<workspace>/iteration-N/static.json` (where N is the current iteration number). This captures the post-fix static state so Phase 8's `skill-eval` ship-ready stop criterion can compare against fresh score / warnings values. If Phase 0 was skipped (because `skill-eval` was unavailable), skip Phase 6.5 too — the Phase 8 row for skill-eval simply does not fire.
+
+```bash
+python3 <skill-eval-path>/scripts/static_check.py <target_skill_dir> --out <workspace>/iteration-N/static.json
+```
 
 ---
 
@@ -214,7 +222,7 @@ Mostly identical to `claude-md-parallel-audit` Phase 8, plus one SKILL.md-specif
 | HIGH avg plateau for 2 consecutive iterations (avg change < 1) | Structural limit reached — remaining issues are likely deliberate design |
 | iteration ≥ max_iterations | Hard limit — report current state, flag diminishing returns |
 | 0 fix candidates from Phase 4 | Nothing actionable left |
-| Phase 0 `skill-eval` re-run reports `score = 1.0` AND `warnings = 0` (SKILL.md-specific) | Structurally ship-ready: re-run static_check after the iteration's Edits; if it now returns a perfect score, the SKILL.md has crossed `skill-eval`'s static bar. Combined with practical convergence from the prose audit above, this signals the SKILL.md is in good shape on both layers |
+| Phase 6.5's `<workspace>/iteration-N/static.json` reports `score = 1.0` AND `warnings = 0` (SKILL.md-specific) | Structurally ship-ready: check the post-fix static.json produced by Phase 6.5; if it now shows a perfect score, the SKILL.md has crossed `skill-eval`'s static bar. Combined with practical convergence from the prose audit above, this signals the SKILL.md is in good shape on both layers |
 
 Report the iteration history (Phase 3 tables across all iterations) so the user can see the trajectory.
 
@@ -241,7 +249,7 @@ After all iterations complete, present a final report with the same structure as
 ### Fixes applied
 - (line range) before → after — 1-sentence rationale
 
-### Remaining known design choices (carried over to exclusion list)
+### Remaining accepted exclusions (carried over)
 - ...
 
 ### Recommendation
@@ -252,7 +260,7 @@ After all iterations complete, present a final report with the same structure as
 
 | Tool | Use |
 |---|---|
-| `Agent` | Parallel subagent dispatch (Phase 2, 4.5, 4.6, 5.5). `run_in_background: true` for Phase 2; single-agent dispatches can be foreground |
+| `Agent` | Parallel subagent dispatch (Phase 2, 4.5, 4.6, 5.5). `run_in_background: true` for Phase 2 (N parallel auditors); Phase 4.5 / 4.6 (1 subagent each) can be foreground; Phase 5.5 dispatches 1 per fix candidate (or 1 per option in multi-option mode) — keep foreground since each safety-check gates Phase 5.6 user approval, but spawn the per-fix/per-option safety-checkers in parallel within one tool-call message |
 | `Read` | Phase 1.5 (draft section purposes); verify line numbers before fix drafting; read `agents/*.md` when dispatching subagents |
 | `AskUserQuestion` | Phase 1 setup, Phase 1.5 section purpose confirmation, Phase 5.6 fix approval — never use plain text questions |
 | `Edit` | Apply approved fixes |
