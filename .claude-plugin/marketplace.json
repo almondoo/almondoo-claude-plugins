@@ -27,7 +27,7 @@
       "name": "parallel-audit",
       "description": "Event-driven multi-agent parallel audit of agent-instruction markdown files (CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md). Dispatches N independent subagents (default N=3, opt-in N=9), aggregates findings by reproducibility threshold, filters shared blind spots, classifies redundancy against Claude Code defaults or sibling skills, and proposes targeted fixes via per-fix user approval. Designed as a diagnostic tool for specific symptoms (post-refactor, rule being ignored, behavior drift, pre-shipping check), not for routine maintenance. Successor to claude-md-parallel-audit + skill-md-parallel-audit, unified under a target_type parameter.",
       "source": "./plugins/parallel-audit",
-      "version": "0.2.0",
+      "version": "1.0.0",
       "category": "productivity",
       "keywords": [
         "audit",
