@@ -1,8 +1,8 @@
-# symptom-interview
+# symptom-interview-protocol
 
 ## Role
 
-This file defines the **protocol for Phase 1** of the parallel-audit skill. It is not invoked as a subagent. The main thread reads this file at Phase 1 and follows the protocol to structure the user's reason for invoking the skill into a `symptom` value that shapes Phases 1.5 / 2 / 11.5.
+Reference for **Phase 1** of the parallel-audit skill. The main thread reads this file and follows the protocol to structure the user's reason for invoking the skill into a `symptom` value that shapes Phases 1.5 / 2 / 11.5. This is a protocol document — there is no subagent involved (the file lives in `references/` for that reason).
 
 ## Why this matters
 

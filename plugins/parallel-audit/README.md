@@ -58,12 +58,12 @@ parallel-audit/
 │       │   ├── auditor.md                 # 7 軸 HIGH 重大度監査 (file-type agnostic)
 │       │   ├── false-positive-detector.md
 │       │   ├── fix-safety-checker.md
-│       │   ├── redundancy-checker.md      # target_type 分岐 (defaults vs siblings)
-│       │   └── symptom-interview.md       # Phase 1 の症状構造化
+│       │   └── redundancy-checker.md      # target_type 分岐 (defaults vs siblings)
 │       ├── references/
-│       │   ├── claude-md-specifics.md     # CLAUDE.md 固有 exclusion + auto-mode classifier playbook
-│       │   ├── skill-md-specifics.md      # SKILL.md 固有 exclusion + skill-eval 連携
-│       │   └── ab-testing.md              # Phase 11.5(b) optional A/B 統合ガイド
+│       │   ├── claude-md-specifics.md          # CLAUDE.md 固有 exclusion + auto-mode classifier playbook
+│       │   ├── skill-md-specifics.md           # SKILL.md 固有 exclusion + skill-eval 連携
+│       │   ├── ab-testing.md                   # Phase 11.5(b) optional A/B 統合ガイド
+│       │   └── symptom-interview-protocol.md   # Phase 1 の症状構造化プロトコル
 │       └── evals/
 │           └── evals.json                 # トリガー / 振る舞いテスト
 └── README.md

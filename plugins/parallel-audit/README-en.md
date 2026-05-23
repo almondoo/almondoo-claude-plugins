@@ -58,12 +58,12 @@ parallel-audit/
 │       │   ├── auditor.md                 # 7-axis HIGH-severity audit (file-type agnostic)
 │       │   ├── false-positive-detector.md
 │       │   ├── fix-safety-checker.md
-│       │   ├── redundancy-checker.md      # branches on target_type (defaults vs siblings)
-│       │   └── symptom-interview.md       # Phase 1 symptom structuring
+│       │   └── redundancy-checker.md      # branches on target_type (defaults vs siblings)
 │       ├── references/
-│       │   ├── claude-md-specifics.md     # CLAUDE.md exclusion defaults + auto-mode classifier playbook
-│       │   ├── skill-md-specifics.md      # SKILL.md exclusion defaults + skill-eval integration
-│       │   └── ab-testing.md              # Phase 11.5(b) optional A/B integration guide
+│       │   ├── claude-md-specifics.md          # CLAUDE.md exclusion defaults + auto-mode classifier playbook
+│       │   ├── skill-md-specifics.md           # SKILL.md exclusion defaults + skill-eval integration
+│       │   ├── ab-testing.md                   # Phase 11.5(b) optional A/B integration guide
+│       │   └── symptom-interview-protocol.md   # Phase 1 symptom structuring protocol
 │       └── evals/
 │           └── evals.json                 # trigger / behavior tests
 └── README.md

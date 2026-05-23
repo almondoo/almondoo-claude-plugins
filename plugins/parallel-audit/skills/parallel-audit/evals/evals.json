@@ -4,7 +4,7 @@
     {
       "id": 1,
       "name": "claude-md-post-refactor-default-flow",
-      "prompt": "I just added several new Tier 2/Tier 3 entries to ~/.claude/CLAUDE.md and want to verify the wording doesn't have hidden contradictions or undefined terms before I rely on it. Please run the parallel audit. Defaults are fine.",
+      "prompt": "yo, just refactored a chunk of ~/.claude/CLAUDE.md (added like 5-6 Tier2/Tier3 entries around git ops and the gh cli) — before I start relying on it for real, can you do that multi-agent audit thing to make sure I didn't introduce contradictions or leave terms hanging? defaults are fine i think",
       "expected_output": "Phase 1 symptom interview via AskUserQuestion → user selects 'post-refactor verification'. Phase 1.5 keeps full-file scope. Phase 2 confirms target=~/.claude/CLAUDE.md, target_type=claude-md (auto-detected), N=3, threshold=2, max_iterations=3, exclusions pre-loaded from references/claude-md-specifics.md and presented as multi-select. Phase 2.5 skipped (claude-md target). Phase 3 section purposes confirmed via batch AskUserQuestion. Phase 4 dispatches 3 sonnet subagents in a single tool-call message with run_in_background=true. Phase 5 produces Table A and Table B with ≥2/3 threshold. Phase 6/6.5/7/8/9/10 standard pipeline. Phase 11 anticipates auto-mode classifier (CLAUDE.md is agent config) and uses the references/claude-md-specifics.md authorization template if blocked. Phase 11.5(a) re-dispatch. Phase 12 stop check.",
       "files": [],
       "assertions": [
@@ -30,13 +30,13 @@
     {
       "id": 2,
       "name": "skill-md-pre-shipping-with-eval-integration",
-      "prompt": "I'm about to ship a new plugin and want a final structural+prose audit on its SKILL.md before publishing. The file is /Users/tm/development/oss/almondoo-claude-plugins/plugins/parallel-audit/skills/parallel-audit/SKILL.md. Use defaults and run skill-eval's static check too if available.",
+      "prompt": "about to publish a new plugin in our marketplace and want one more pass on the SKILL.md before it goes out — path is /Users/tm/development/oss/almondoo-claude-plugins/plugins/parallel-audit/skills/parallel-audit/SKILL.md. can you do the parallel audit + also run skill-eval's static check if it's installed? defaults ok",
       "expected_output": "Phase 1 symptom interview → user selects 'pre-shipping check'. The skill enforces target_type=skill-md (rejecting pre-shipping for claude-md targets). Phase 1.5 full-file scope, ensure_phase_2_5=true and ensure_phase_11_5c=true are set. Phase 2 auto-detects target_type=skill-md from the SKILL.md filename, pre-loads SKILL.md-specific exclusion defaults (subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter-delegated-to-skill-eval). Phase 2.5 runs skill-eval's static_check.py and writes static.json (because ensure_phase_2_5 is set). Phase 3 section purposes baseline. Phase 4 dispatches 3 sonnet subagents. Phase 5/6/6.5/7/8/9/10/11 standard. Phase 11 does NOT trigger the auto-mode classifier (plugin source, not installed config) so no authorization template needed. Phase 11.5(a) re-dispatch, Phase 11.5(c) re-runs static_check.py (because ensure_phase_11_5c is set). Phase 12 stop check includes the skill-eval ship-ready criterion (score==1.0 AND warnings==0).",
       "files": [],
       "assertions": [
         {"text": "Phase 1 symptom interview triggers, user selects pre-shipping; the skill validates that target_type will be skill-md (would redirect to 'post-refactor' if it were claude-md)", "kind": "behavioral"},
         {"text": "Phase 2 auto-detects target_type=skill-md from the SKILL.md filename in the path", "kind": "behavioral"},
-        {"text": "Phase 2 pre-loads the SKILL.md-specific exclusion defaults from references/skill-md-specifics.md (4 items: subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter delegated to skill-eval)", "kind": "behavioral"},
+        {"text": "Phase 2 pre-loads the SKILL.md-specific exclusion defaults from references/skill-md-specifics.md (4 base items: subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter delegated to skill-eval — plus a conditional 5th item pointing to skill-eval's static.json when Phase 2.5 ran)", "kind": "behavioral"},
         {"text": "Phase 2.5 runs skill-eval's static_check.py on the target skill directory and writes the result to workspace/iteration-0/static.json (because ensure_phase_2_5 is set by the pre-shipping symptom)", "kind": "behavioral"},
         {"text": "Phase 2 appends a 5th exclusion item pointing to the static.json so Phase 4 auditors know not to re-flag the structural axes covered by skill-eval", "kind": "behavioral"},
         {"text": "Phase 7 dispatches redundancy-checker with target_type=skill-md (so it compares against skill-creator / skill-eval / sibling skills, not Claude Code defaults), and includes sibling_skills from glob plugins/*/skills/*/SKILL.md of the marketplace root", "kind": "behavioral"},
@@ -48,12 +48,12 @@
     {
       "id": 3,
       "name": "routine-warning-abort",
-      "prompt": "Run a multi-agent audit on ~/.claude/CLAUDE.md. No specific issue, just routine maintenance.",
+      "prompt": "hey, can u run that multi-agent audit on ~/.claude/CLAUDE.md? no specific issue, just doing a periodic cleanup",
       "expected_output": "Phase 1 symptom interview presents 6 options; user selects 'routine'. Phase 1 emits the routine warning (cost mismatch, asymptote, lighter alternatives) and asks for explicit confirmation. The expected behavior is the executor honors the warning protocol — if the user picks 'No, I'll use a lighter tool instead', the skill aborts gracefully and suggests claude-md-improver or a single-pass Claude review. The skill does NOT silently proceed to Phase 2 just because the user invoked the skill.",
       "files": [],
       "assertions": [
         {"text": "Phase 1 symptom interview presents the 6 options including 'routine' as an explicit option", "kind": "behavioral"},
-        {"text": "When the user selects 'routine', Phase 1 emits the warning (asymptote / cost / lighter alternatives) per agents/symptom-interview.md, not silent pass-through", "kind": "behavioral"},
+        {"text": "When the user selects 'routine', Phase 1 emits the warning (asymptote / cost / lighter alternatives) per references/symptom-interview-protocol.md, not silent pass-through", "kind": "behavioral"},
         {"text": "The warning lists at least one concrete lighter alternative (single-pass Claude review or claude-md-improver) with their relative cost", "kind": "behavioral"},
         {"text": "Phase 1 asks for explicit confirmation via AskUserQuestion after the warning (does not assume the user wants to proceed)", "kind": "behavioral"},
         {"text": "If the user picks 'No, I'll use a lighter tool', the skill aborts gracefully — does not run Phase 2 onward", "kind": "behavioral"},
@@ -63,7 +63,7 @@
     {
       "id": 4,
       "name": "specific-rule-scope-narrowing",
-      "prompt": "My ~/.claude/CLAUDE.md has a rule about 'always use built-in tools instead of Bash for file I/O' but I noticed Claude keeps using grep via Bash anyway. I want to audit just that rule and the nearby sections to find what's making it ambiguous. N=3 is fine.",
+      "prompt": "ok so in ~/.claude/CLAUDE.md I have this whole rule about using built-in Read/Grep instead of cat/grep through bash — but claude keeps falling back to `grep` via Bash for me, especially when searching across multiple dirs. can u audit just that rule + whatever sections reference it and figure out where the ambiguity is? don't audit the whole file, just that part. N=3",
       "expected_output": "Phase 1 symptom interview → user selects 'specific rule ignored/misapplied'. Phase 1 follow-up AskUserQuestion asks which rule. User identifies the 'use built-in tools' rule. Phase 1.5 sets scope_hint=rule-and-neighbors, scope_target=<rule text or section heading>. Phase 4 auditors receive scope_directive telling them to read only the named rule ± 20 lines AND grep the file for terms appearing in the rule, reading any other section that references those terms. Per-instance token usage is 1/3-1/5 of full-file. Rest of workflow proceeds with the narrowed scope.",
       "files": [],
       "assertions": [
@@ -79,13 +79,37 @@
     {
       "id": 5,
       "name": "should-not-trigger-on-skill-authoring",
-      "prompt": "I want to create a brand new SKILL.md from scratch for a workflow that captures the steps when users ask about migrating Postgres data. Walk me through writing the SKILL.md, drafting test prompts, and benchmarking whether it actually helps a subagent.",
+      "prompt": "thinking about making a new skill that captures the steps i use when users ask about migrating postgres data (like pg_dump → s3 → rds restore kind of stuff). walk me through writing the SKILL.md from scratch, coming up with test prompts, and benchmarking whether the skill actually helps a subagent vs just letting claude wing it",
       "expected_output": "The executor does NOT trigger parallel-audit. It recognizes that the request asks for (a) authoring a new SKILL.md from scratch and (b) with-skill vs without-skill A/B benchmarking — both owned by skill-creator. The executor either invokes skill-creator directly or tells the user that skill-creator is the right tool, citing the authoring-vs-audit distinction.",
       "files": [],
       "assertions": [
         {"text": "The executor does NOT invoke parallel-audit's Phase 1 setup for this prompt", "kind": "behavioral"},
         {"text": "The executor recognizes that 'create a SKILL.md from scratch' + 'benchmark whether it helps' map to skill-creator's authoring + A/B benchmarking workflow, not to multi-agent prose audit of an existing file", "kind": "behavioral"},
         {"text": "The executor either invokes skill-creator directly or tells the user that skill-creator is the right tool, citing the authoring-vs-audit distinction (parallel-audit's 'Do NOT use' list explicitly excludes this case)", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "should-not-trigger-on-source-code-review",
+      "prompt": "audit my auth code for bugs / security issues — main file is src/auth/session.ts but there's also some related stuff in src/auth/middleware.ts and src/lib/jwt.ts. multi-agent review would be great if possible since this is touching session handling and i want to be sure",
+      "expected_output": "The executor does NOT trigger parallel-audit. Even though the prompt mentions 'audit' and 'multi-agent review', parallel-audit's 'Do NOT use' list explicitly excludes auditing non-instruction files (source code, regular docs, READMEs). The executor either suggests a different code-review tool / agent or proceeds with a single-pass code review, citing that parallel-audit is for agent-instruction markdown only.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor does NOT invoke parallel-audit's Phase 1 setup", "kind": "behavioral"},
+        {"text": "The executor recognizes that .ts source files are not the target type for parallel-audit (which is restricted to CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md per the skill's description and 'Do NOT use' list)", "kind": "behavioral"},
+        {"text": "The executor either redirects to a code-review tool / agent (e.g., pr-review-toolkit:code-reviewer) or proceeds with a single-pass code review, not parallel-audit", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "should-not-trigger-on-settings-json-review",
+      "prompt": "can you do that convergence audit thing on my ~/.claude/settings.json? want to make sure the permissions.deny entries don't overlap weirdly with permissions.allow",
+      "expected_output": "The executor does NOT trigger parallel-audit even though the user uses parallel-audit's signature term 'convergence audit'. settings.json is structured JSON config, not prose instruction markdown — the 7-axis taxonomy (missing qualifier / grammar error / etc.) does not apply. The executor explains the scope mismatch and either reviews the file directly or suggests a different tool.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor does NOT invoke parallel-audit's Phase 1 setup", "kind": "behavioral"},
+        {"text": "The executor recognizes that settings.json is JSON config, not the markdown instruction-file target type parallel-audit handles (the 7 axes assume prose)", "kind": "behavioral"},
+        {"text": "The executor explains the scope mismatch and either reviews permissions.deny / permissions.allow directly or suggests a more appropriate tool — does not silently run parallel-audit just because the user said 'convergence audit'", "kind": "behavioral"}
       ]
     }
   ]

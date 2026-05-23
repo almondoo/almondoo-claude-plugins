@@ -1,6 +1,6 @@
 ---
 name: parallel-audit
-description: Event-driven multi-agent parallel audit of agent-instruction markdown files (CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md) for HIGH-severity quality issues — missing qualifiers, grammar errors, terminology drift, cross-section logical contradictions, implicit premises, incomplete enumerations, and undefined terms. Dispatches N independent subagents (default N=3, opt-in N=9 for deep audit), aggregates findings by reproducibility threshold, filters shared blind spots, classifies redundancy against Claude Code defaults or sibling skills, and proposes targeted fixes via per-fix user approval. Use this skill when the user asks to audit / review / verify / quality-check an instruction file, mentions multi-agent audit / convergence audit / parallel review / instruction file consistency / audit my SKILL.md, has just refactored their CLAUDE.md and wants verification, notices a specific rule being ignored, observes agent behavior drift, or asks for high-confidence reproducibility on what is wrong with a long instruction file. Designed as event-driven diagnostic — Phase 1 warns on routine use. Distinct from template-comparison audits (e.g. claude-md-management:claude-md-improver) — this skill uses independent parallel audits + reproducibility threshold, not template matching. Successor to claude-md-parallel-audit + skill-md-parallel-audit, unified under a target_type parameter.
+description: Multi-agent parallel audit of agent-instruction markdown files (CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md) for HIGH-severity defects — missing qualifiers, terminology drift, cross-section contradictions, unstated premises, undefined terms. Dispatches N independent subagents, keeps only findings flagged by multiple instances, then drafts fixes with per-fix approval. Use this skill whenever the user asks to audit / review / verify / quality-check / convergence-check an instruction file, just refactored a CLAUDE.md, notices a rule being ignored, observes agent behavior drift, or wants reproducible defect detection on a long instruction file — even if they don't explicitly say "audit". Event-driven diagnostic; routine / scheduled use is discouraged.
 ---
 
 # parallel-audit
@@ -49,7 +49,7 @@ Do NOT use this skill for:
 
 ## Target types
 
-The skill detects `target_type` from the target file path and loads the corresponding specifics document:
+The skill detects `target_type` from the target file path (case-sensitive — the Claude Code spec requires uppercase `SKILL.md` / `CLAUDE.md`) and loads the corresponding specifics document:
 
 | Target type | Detection | Specifics document |
 |---|---|---|
@@ -66,13 +66,13 @@ Defaults shown. Phase 2 asks the user to confirm or override.
 
 | Parameter | Default | Description |
 |---|---|---|
-| `target_file` | (asked) | Absolute path of the file to audit |
+| `target_file` | (from initial message, or asked) | Absolute path of the file to audit |
 | `target_type` | (auto-detected) | `claude-md` or `skill-md` (from file path) |
 | `N` | 3 | Number of parallel auditor subagents per iteration. Opt-in to 5 or 9 for deeper convergence |
 | `threshold` | 2 | Minimum instances that must flag an issue for it to be considered reproducible (≥2/3 ≈ 67%) |
 | `max_iterations` | 3 | Hard upper bound on audit→fix→verify cycles. Reflects the empirically observed asymptote |
 | `exclusions` | (asked, with target-type defaults pre-loaded) | Items the user does NOT want re-flagged. See `references/<target>-specifics.md` for pre-loaded defaults |
-| `section_purposes` | (drafted then asked in Phase 3) | Map from each section heading to its 1-line purpose; established once per audit and reused across iterations |
+| `section_purposes` | (built at Phase 3) | Map from each section heading to its 1-line purpose; established once per audit and reused across iterations |
 | `ab_testing_enabled` | `false` | Whether Phase 11.5(b) runs a `skill-eval` A/B benchmark after fixes. Opt-in only; requires `skill-eval` to be installed separately (it is not bundled in this marketplace). See `references/ab-testing.md` |
 | `model_string` | `"sonnet"` | The string passed as the Agent tool's `model` parameter for Phase 4 parallel auditors. Default `"sonnet"` resolves to the current Sonnet generation at dispatch time. The user may override at Phase 2 by specifying a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility across an audit |
 
@@ -86,14 +86,14 @@ The skill runs in phases grouped as **Pre-check → Setup → Detect → Triage 
 
 #### Phase 1: Symptom interview (always)
 
-Read `agents/symptom-interview.md` and follow its protocol to structure the user's reason for invoking the skill. Use **AskUserQuestion** to present the symptom options. Possible answers shape the rest of the workflow:
+Read `references/symptom-interview-protocol.md` and follow its protocol to structure the user's reason for invoking the skill. Use **AskUserQuestion** to present the symptom options. Possible answers shape the rest of the workflow:
 
 - **Post-refactor verification** → keep full-file scope in Phase 1.5; standard exclusions
 - **Specific rule ignored / misapplied** → Phase 1.5 narrows to that rule + neighbors
 - **Behavior drift** → full-file scope; consider `ab_testing_enabled: true` in Phase 2
 - **Pre-shipping check** (SKILL.md before publishing a plugin) → full-file scope; ensure Phase 2.5 static check runs
 - **Post-model-upgrade isolation** → full-file scope; standard exclusions
-- **Routine maintenance** → emit warning per `agents/symptom-interview.md` and require explicit confirmation to proceed
+- **Routine maintenance** → emit warning per `references/symptom-interview-protocol.md` and require explicit confirmation to proceed
 
 The symptom answer is stored as `symptom` and passed to Phase 1.5 to determine scope, and to Phase 11.5(b) decision.
 
@@ -156,19 +156,13 @@ Read `agents/auditor.md` and use its full content as the prompt for each subagen
 
 Dispatch all `N` subagents in **one tool-call message** with `run_in_background: true`, `subagent_type: general-purpose`, and `model: "sonnet"`.
 
-The `model: "sonnet"` value comes from the `model_string` configuration parameter (default `"sonnet"`). **Decision policy**:
-
-- **Default path**: Phase 2 leaves `model_string` at `"sonnet"` — the Agent tool resolves the alias to the current Sonnet generation available in the harness. Phase 4 dispatches with this string.
-- **User override path**: at Phase 2's parameter confirmation step, the user may override `model_string` to a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility across the audit. The orchestrator surfaces this option as part of the standard Phase 2 AskUserQuestion (the same question that confirms `N` / `threshold` / `max_iterations`).
-- **Parent-is-Sonnet case**: if the orchestrating parent model is already Sonnet, passing `"sonnet"` to Phase 4 subagents is effectively a no-op but the explicit `model` parameter is still required. Do not omit it — the documented dispatch shape is uniform regardless of parent model.
-- **Re-dispatches** (Phase 11.5(a) re-verify): use the same `model_string` value as iteration 1 for consistency. If the user did not override at Phase 2, all iterations use the same `"sonnet"` alias resolution at their respective dispatch times.
+Pass `model_string` (default `"sonnet"`) to the `model` parameter — always pass it explicitly, even when the parent is already Sonnet, so the dispatch shape stays uniform. The user may override at Phase 2 with a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility; the same value is reused across iterations. Phase 4 is the **only** place this skill overrides parent-model inheritance — at Opus-level parent rates, N × iter cost would explode, and the ≥threshold aggregation absorbs per-instance noise so Sonnet's HIGH-severity detection quality suffices. Phases 6.5 / 7 / 9 must still inherit the parent model: each is a single-agent evaluation with no aggregation buffer, so their judgments need parent-level quality.
 
 Critical requirements:
 
-- All N subagents launched in the **same tool-call message** (parallel dispatch)
-- `run_in_background: true` so the harness notifies on completion
-- **`model: "sonnet"` explicit override.** Phase 4 is the only place this skill overrides the parent-model-inheritance default. Rationale: when the parent model is more expensive than Sonnet (e.g., Opus), N×iter cost would explode at parent-model rates, and the ≥threshold aggregation absorbs per-instance noise so Sonnet's HIGH-severity detection quality suffices. When the parent IS Sonnet, the override is a no-op but stays explicit for consistency. Phases 6.5 / 7 / 9 (single-agent evaluation subagents — false-positive filtering, redundancy classification, fix safety verdict) must still inherit the parent's model: each runs once with no aggregation buffer, so their judgments need parent-level quality
-- Do NOT add "be honest" / "no sycophancy" / "be thorough" instructions on top of `agents/auditor.md` — the user's CLAUDE.md Forthright Assessment rules already cover this and extra instructions bias the audit
+- All N subagents launched in the **same tool-call message** with `run_in_background: true`
+- The prompt is `agents/auditor.md` content with placeholders substituted — byte-identical across instances
+- Do NOT append "be honest" / "no sycophancy" / "be thorough" — the user's CLAUDE.md Forthright Assessment rules already cover this; extra instructions bias the audit
 - Do NOT modify the 7 axes, output format, or "what not to flag" section in `agents/auditor.md` per-iteration. Touch only the placeholders.
 
 #### Phase 5: Aggregate (always)
@@ -228,7 +222,7 @@ Read `agents/redundancy-checker.md` and dispatch one subagent (foreground, paren
 - `target_type`: from Phase 2 — determines whether the checker compares against Claude Code defaults (`claude-md`) or sibling skills (`skill-md`)
 - `convergent_issues`: REAL fix candidates from Phase 6.5, with cited section text (line ± 10 lines)
 - `section_purposes`: from Phase 3
-- `sibling_skills`: only for `target_type == "skill-md"` — list of installed sibling skill names + descriptions (the orchestrator collects via `Glob plugins/*/skills/*/SKILL.md` of the marketplace; if the target SKILL.md is not in a marketplace layout, pass an empty list)
+- `sibling_skills`: only for `target_type == "skill-md"` — list of installed sibling skill names + descriptions. The orchestrator resolves these via the strategy in `references/skill-md-specifics.md` "Marketplace root detection"; if no marketplace layout is found, pass an empty list
 
 The subagent returns KEEP / SIMPLIFY / REMOVE per issue. Trust the classification, but if it returns REMOVE for a rule you (the main thread) believe has unique value, surface the disagreement to the user — same drift-hedge logic as Phase 5.
 
@@ -246,18 +240,12 @@ For each REAL fix candidate, draft a fix matching its Phase 7 classification:
 
 Read the target file with Read to verify current line numbers and content before drafting.
 
-**Draft mode — single vs. multi-option**
+**Draft mode**
 
-For each fix, choose drafting mode by scope using these criteria in order:
+- **Multi-option mode** (2–3 alternatives, each labeled with its trade-off) when the fix is *substantive*: it restructures a rule (move / split / merge), offers a meaningful KEEP vs SIMPLIFY vs REMOVE choice, or changes more than ~3 lines on either side of the diff.
+- **Single-proposal mode** (one before/after diff) for ≤ 3-line wording tweaks with no structural change and no meaningful alternative.
 
-1. **Lines-changed definition**: count lines as `max(before_text_line_count, after_text_line_count)` (i.e., the larger of "lines deleted" and "lines added"). A pure 2-line wording tweak counts as 2; a fix that replaces 4 lines with 1 counts as 4; a fix that adds 5 new lines to a previously empty position counts as 5.
-2. **Structural-change precedence**: if the fix **restructures a rule** (re-orders, splits, merges, or repositions it across sections), it is **always substantive regardless of lines-changed count** — even a 1-line restructure (e.g., moving a single bullet into a different section). Use multi-option mode.
-3. **Choice precedence**: if there is a **meaningful choice between approaches** (e.g., delete vs. compress vs. keep-with-refinement, or two materially different wordings with different trade-offs), it is **always substantive regardless of lines-changed count**. Use multi-option mode.
-4. **Default by line count** (only if neither precedence rule above applies):
-   - **Single-proposal mode** when lines-changed ≤ 3: draft one before/after diff
-   - **Multi-option mode** when lines-changed > 3: draft 2-3 alternative before/after options, each labeled with its trade-off
-
-Multi-option mode shifts the decision from "do you agree with my fix?" to "which of these alternatives best fits your intent?" — giving the user more agency on substantive changes.
+When in doubt, use multi-option mode. It shifts the decision from "do you agree with my fix?" to "which alternative fits your intent?" — giving the user more agency on substantive changes, at the cost of one extra option to read.
 
 #### Phase 9: Fix safety check (before showing each fix to user)
 
@@ -301,12 +289,7 @@ Include trade-off labels in option descriptions so the user sees why each option
 
 #### Phase 11: Apply via Edit (when fixes approved)
 
-Use **Edit** to apply approved fixes. If the target is an agent-config file that trips the auto-mode classifier, follow the playbook in `references/claude-md-specifics.md` (the "Yes, update my `<file>`" authorization template, retry once). The classifier triggers depend on the target path:
-
-- CLAUDE.md / CLAUDE.local.md at project root → triggers
-- `~/.claude/CLAUDE.md`, `~/.claude/settings.json`, `~/.claude/settings.local.json` → trigger
-- `.claude/skills/*`, `.claude/agents/*`, `.claude/hooks/*`, `.claude/commands/*`, `.mcp.json` → trigger
-- SKILL.md inside `plugins/<name>/skills/<name>/` (marketplace source) → does NOT trigger (plugin artifact, not installed config)
+Use **Edit** to apply approved fixes. If the auto-mode classifier blocks the Edit (typical for `claude-md` targets and for `skill-md` targets installed under `~/.claude/`), follow the playbook in `references/claude-md-specifics.md` — it owns the canonical trigger-location table and the "Yes, update my `<file>`" authorization template. For SKILL.md location nuances (marketplace source vs installed), see `references/skill-md-specifics.md` "Phase 11 location-aware classifier behavior".
 
 After all Edit calls, briefly confirm what was applied (file list + 1-line description per fix).
 
@@ -373,29 +356,11 @@ After all iterations complete, present a final report:
 | Tool | Use |
 |---|---|
 | `Agent` | Parallel subagent dispatch (Phase 4 audit, Phase 6.5 false-positive, Phase 7 redundancy, Phase 9 safety). `run_in_background: true` for Phase 4 (N parallel auditors); Phase 6.5 / 7 each run a single subagent (`run_in_background: false` is fine since there is nothing to parallelize with); Phase 9 dispatches 1 per fix candidate (or 1 per option) in parallel within a **single tool-call message** with `run_in_background: true` and awaits all completions before Phase 10 (the orchestrator gates each Phase 10 approval question on its safety-checker result) |
-| `Read` | Phase 3 (section purposes), verify line numbers before Phase 8 drafting, read `agents/*.md` files when dispatching specialized subagents, read `references/*-specifics.md` based on `target_type` |
+| `Read` | Phase 1 (read `references/symptom-interview-protocol.md`); Phase 3 (section purposes); verify line numbers before Phase 8 drafting; read `agents/*.md` when dispatching specialized subagents; read `references/<target_type>-specifics.md` at Phase 2; read `references/ab-testing.md` at Phase 2 when `ab_testing_enabled` is being decided |
 | `AskUserQuestion` | Phase 1 symptom interview, Phase 1.5 scope confirmation, Phase 2 setup, Phase 3 section purposes confirmation, Phase 10 fix approval, Phase 11 auto-mode classifier authorization (per `references/claude-md-specifics.md`) — never use plain-text questions per CLAUDE.md communication rule |
 | `Edit` | Apply approved fixes; follow `references/claude-md-specifics.md` playbook when blocked |
 | `Glob` | Phase 7 sibling-skill discovery (`target_type == "skill-md"` only); Phase 2 SKILL.md candidate discovery when user passes a plugin root instead of a SKILL.md path |
 | `Bash` | Phase 2.5 / 11.5(c) `skill-eval static_check.py` execution; Phase 11.5(b) optional `skill-eval` benchmark execution |
-
-## Bundled agents
-
-| Agent file | Used in | Dispatched | Purpose |
-|---|---|---|---|
-| `agents/auditor.md` | Phase 4 | N parallel (default 3), `run_in_background: true`, `model: "sonnet"` | Independent HIGH-severity audit along 7 axes; returns up to 10 findings as a markdown table. **File-type agnostic** — same axes apply to CLAUDE.md and SKILL.md targets |
-| `agents/false-positive-detector.md` | Phase 6.5 | 1 foreground, parent model inherited | Independent re-read of each convergent issue to filter shared-blind-spot false positives |
-| `agents/redundancy-checker.md` | Phase 7 | 1 foreground, parent model inherited | Classifies each REAL fix candidate as KEEP / SIMPLIFY / REMOVE. **Branches on `target_type`**: against Claude Code defaults for `claude-md`, against `skill-creator` / `skill-eval` / sibling skills for `skill-md` |
-| `agents/fix-safety-checker.md` | Phase 9 | 1 per fix candidate (or 1 per option), dispatched in parallel within one tool-call message with `run_in_background: true`; orchestrator awaits all completions before Phase 10. Parent model inherited | Verifies fix does not break cross-section references, contradict other rules, distort intent; also reports `rule_burden_impact` (REDUCES / NEUTRAL / INCREASES_MINOR / INCREASES_MAJOR) |
-| `agents/symptom-interview.md` | Phase 1 | (no subagent — read as protocol) | Structures the user's symptom answer into a scope hint for Phase 1.5 and a context hint for Phase 2 |
-
-## Reference files
-
-| Reference file | Loaded when | Owns |
-|---|---|---|
-| `references/claude-md-specifics.md` | `target_type == "claude-md"` | CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md exclusion defaults; auto-mode classifier playbook for Phase 11; common shared-blind-spot patterns for Phase 6.5 |
-| `references/skill-md-specifics.md` | `target_type == "skill-md"` | SKILL.md exclusion defaults (subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter delegation to skill-eval); `skill-eval` integration for Phase 2.5 and Phase 11.5(c); common shared-blind-spot patterns specific to SKILL.md |
-| `references/ab-testing.md` | `ab_testing_enabled: true` | Phase 11.5(b) integration with `skill-eval`'s with/without benchmark; user-supplied task set requirement; cost estimate; interpretation guidance for noisy small-effect-size differentials |
 
 ## Common pitfalls
 

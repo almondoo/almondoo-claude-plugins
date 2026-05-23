@@ -43,16 +43,13 @@ python3 <skill-eval-path>/scripts/static_check.py <target_skill_dir> --out <work
 
 ### Resolving `<skill-eval-path>` (try in order, take first hit)
 
-The orchestrator attempts these paths in order. Stop at the first one that has `scripts/static_check.py`:
+Stop at the first path that contains `scripts/static_check.py`:
 
-1. **User-provided path**: if the user passed `skill_eval_path` explicitly at Phase 2, use it. Skip remaining steps.
-2. **`SKILL_EVAL_PATH` env var**: if `SKILL_EVAL_PATH` is set to a directory containing `scripts/static_check.py`, use it. This is the persistent override path for users who have skill-eval source in a known location outside marketplace cache.
-3. **Marketplace cache (current marketplace)**: glob `~/.claude/plugins/cache/<current-marketplace>/skill-eval/skills/skill-eval/scripts/static_check.py` — resolves if skill-eval is added to the current marketplace.
-4. **Marketplace cache (any marketplace)**: glob `~/.claude/plugins/cache/*/skill-eval/skills/skill-eval/scripts/static_check.py` — picks up skill-eval if installed via a different marketplace.
-5. **PATH-resolved**: check if `static_check.py` is on the user's PATH (rare; only if skill-eval has been installed as a binary).
-6. **Not found**: log the warning below and skip Phase 2.5.
+1. **Explicit path**: `skill_eval_path` passed by the user at Phase 2, or the `SKILL_EVAL_PATH` env var if set. This is the persistent override for users who keep skill-eval source outside marketplace cache.
+2. **Plugin cache**: glob `~/.claude/plugins/cache/*/skill-eval/skills/skill-eval/scripts/static_check.py`. If the user installed skill-eval via multiple marketplaces, deduplicate by path and take the first hit.
+3. **Not found**: log the warning below and skip Phase 2.5.
 
-> **Do not look in `tmp/`**. The `tmp/skill-eval/...` path holds skill-eval's own evaluation workspace artifacts (iteration-N/ output), not source code. Source must come from an installed plugin location or the explicit `SKILL_EVAL_PATH` env var.
+> **Do not look in `tmp/`**. The `tmp/skill-eval/...` path holds skill-eval's own evaluation workspace artifacts (iteration-N/ output), not source code. Source must come from an installed plugin location or the explicit override path above.
 
 ### Fallback when skill-eval is not available
 
