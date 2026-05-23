@@ -1,6 +1,6 @@
 ---
 name: parallel-audit
-description: Multi-agent parallel audit of agent-instruction markdown files (CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md) for HIGH-severity defects — missing qualifiers, terminology drift, cross-section contradictions, unstated premises, undefined terms. Dispatches N independent subagents, keeps only findings flagged by multiple instances, then drafts fixes with per-fix approval. Use this skill whenever the user asks to audit / review / verify / quality-check / convergence-check an instruction file, just refactored a CLAUDE.md, notices a rule being ignored, observes agent behavior drift, or wants reproducible defect detection on a long instruction file — even if they don't explicitly say "audit". Event-driven diagnostic; routine / scheduled use is discouraged.
+description: Multi-agent parallel audit of CLAUDE.md, CLAUDE.local.md, AGENTS.md, GEMINI.md, or SKILL.md files for cross-section contradictions, missing qualifiers, terminology drift, and unstated premises. Use this skill whenever the user asks to audit, review, verify, quality-check, or convergence-check one of these files — even without the word "audit" — or mentions a recent refactor, a rule being ignored, observed behavior drift, a pre-shipping check before publishing a plugin, or accumulated session learnings. Dispatches N independent subagents (default 3), keeps only findings flagged by ≥threshold (default 2), classifies redundancy, then proposes targeted fixes with per-fix user approval. Do NOT use for writing a new instruction file (use skill-creator), updating with session learnings (use revise-claude-md), or auditing source code or non-markdown configs.
 ---
 
 # parallel-audit
@@ -76,6 +76,15 @@ Defaults shown. Phase 2 asks the user to confirm or override.
 | `ab_testing_enabled` | `false` | Whether Phase 11.5(b) runs a `skill-eval` A/B benchmark after fixes. Opt-in only; requires `skill-eval` to be installed separately (it is not bundled in this marketplace). See `references/ab-testing.md` |
 | `model_string` | `"sonnet"` | The string passed as the Agent tool's `model` parameter for Phase 4 parallel auditors. Default `"sonnet"` resolves to the current Sonnet generation at dispatch time. The user may override at Phase 2 by specifying a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility across an audit |
 
+### Default calibration
+
+Why these defaults?
+
+- **`threshold = 2` (≥2/3 ≈ 67%)** — chosen over majority (50%) and supermajority (75%). At 67% (≥2/3), one missed-by-one-auditor real defect is still recovered by the other two. Moving to 75% (e.g., `N=4 / threshold=3`) requires three auditors to independently converge on the same true positive — too restrictive for genuine HIGH-severity prose defects given inter-instance variance. Moving down to 50% (e.g., `N=4 / threshold=2`) re-admits single-pair false positives that the multi-agent design was built to filter. Note: the 67% framing anchors on default `N=3`. At opt-in `N=5 / threshold=3` the bar is 60%, and at `N=9 / threshold=4` it is 44% — deeper tiers buy redundancy (more independent corroborators in absolute count), not stricter percentage agreement.
+- **`N = 3`** — minimum N for ≥2 to be meaningful (2/2 is unanimous; 2/3 is convergence). Higher N (5, 9) buys statistical power but multiplies cost and rarely changes the convergent-issue set for files under ~500 lines.
+- **`max_iterations = 3`** — empirically observed asymptote (see Positioning section). Iterations 4+ tend to produce diminishing real defects and increasing noise from previously-discussed exclusions.
+- **`model_string = "sonnet"`** — Phase 4 is the only place this skill overrides parent-model inheritance. The ≥threshold aggregation absorbs per-instance noise, so Sonnet's HIGH-severity prose detection quality suffices at much lower per-token rates than Opus. Phases 6.5/7/9 still inherit the parent model since each is a single-agent evaluation with no aggregation buffer.
+
 ## Workflow
 
 The skill runs in phases grouped as **Pre-check → Setup → Detect → Triage → Fix → Apply → Verify**. Each phase has a clear precondition and output. Do not skip phases unless explicitly noted.
@@ -131,6 +140,8 @@ Per `references/skill-md-specifics.md`, if `target_type == "skill-md"` AND the `
 
 **Important**: `skill-eval` is NOT bundled in this marketplace (`almondoo-claude-plugins`). The integration is preserved as an optional capability: if the user has installed `skill-eval` from a different source (or has its source available on disk), the orchestrator can invoke it. If not installed, Phase 2.5 is **skipped without error** (log a one-line warning "Phase 2.5 skipped — `skill-eval` not available; structural axes will not be pre-cleared from the prose audit"). Resolution strategy for the skill-eval path is documented in `references/skill-md-specifics.md`.
 
+When Phase 2.5 successfully produces a `static.json`, append the conditional 5th exclusion item (see `references/skill-md-specifics.md` exclusion #5) to the Phase 2 exclusion list **before Phase 4 dispatches**, so auditors receive the skill-eval delegation context and do not re-flag axes already covered.
+
 If `target_type == "claude-md"`, skip Phase 2.5 entirely (the structural-axis delegation is SKILL.md-specific).
 
 #### Phase 3: Section purposes baseline (always)
@@ -164,6 +175,12 @@ Critical requirements:
 - The prompt is `agents/auditor.md` content with placeholders substituted — byte-identical across instances
 - Do NOT append "be honest" / "no sycophancy" / "be thorough" — the user's CLAUDE.md Forthright Assessment rules already cover this; extra instructions bias the audit
 - Do NOT modify the 7 axes, output format, or "what not to flag" section in `agents/auditor.md` per-iteration. Touch only the placeholders.
+
+**Failure handling for partial returns**: subagents can time out, return malformed (non-table) output, or never complete. Track the number of instances that returned parseable HIGH-issue output (`N_received`) versus dispatched (`N_dispatched`). If `N_received < N_dispatched`:
+
+- Adjust the working threshold for this iteration to `max(2, ceil(N_received × threshold / N_dispatched))` so the convergence math is not broken by silent drop-outs. Never go below 2 — a single auditor's report is not "convergence". Trade-off: this keeps the *percentage* convergence threshold roughly stable but lowers the *absolute count* of corroborators. If your bar is the absolute count (e.g., "I require at least 4 independent flags before I act"), the alternative policy is to abort the iteration entirely on any drop-out and re-dispatch with a fresh N. The proportional formula is the default to keep audits from stalling on transient failures; switch to the abort-and-redispatch policy when count-based convergence is non-negotiable.
+- If `N_received < 2`, abort the iteration and report the degradation to the user before re-dispatching or stopping. Single-instance results are noise, not signal.
+- Surface degradation explicitly in Table A by adding a row `N_dispatched=X, N_received=Y, working_threshold=Z` so the user sees that Phase 5 aggregation used a different threshold than the configured `threshold`. Pass the `working_threshold` (not the configured `threshold`) into the Phase 12 Run parameters report so the trajectory is reproducible.
 
 #### Phase 5: Aggregate (always)
 
@@ -289,7 +306,9 @@ Include trade-off labels in option descriptions so the user sees why each option
 
 #### Phase 11: Apply via Edit (when fixes approved)
 
-Use **Edit** to apply approved fixes. If the auto-mode classifier blocks the Edit (typical for `claude-md` targets and for `skill-md` targets installed under `~/.claude/`), follow the playbook in `references/claude-md-specifics.md` — it owns the canonical trigger-location table and the "Yes, update my `<file>`" authorization template. For SKILL.md location nuances (marketplace source vs installed), see `references/skill-md-specifics.md` "Phase 11 location-aware classifier behavior".
+**Pre-authorize when target is on the classifier trigger list.** For any `claude-md` target or installed `skill-md` target (see trigger-location tables in `references/claude-md-specifics.md` and `references/skill-md-specifics.md`), the classifier trigger is deterministic — issuing Edit first WILL block. **Do not issue Edit first.** Use **AskUserQuestion** immediately with the "Yes, update my `<file>`" template from the playbook, then issue Edit after the explicit authorization. If pre-authorization happens to not release the classifier on the first Edit attempt (the playbook documents release on retry after authorization), use the same authorization to retry. Either way, the user has already authorized — you have eliminated the "block → think → look up playbook → ask → answer" thinking round-trip that the reactive path costs.
+
+For targets NOT on the trigger list, just use **Edit** directly. If the classifier still blocks (rare), fall back to the playbook in `references/claude-md-specifics.md` reactively — it owns the canonical trigger-location table and the "Yes, update my `<file>`" authorization template. For SKILL.md location nuances (marketplace source vs installed), see `references/skill-md-specifics.md` "Phase 11 location-aware classifier behavior".
 
 After all Edit calls, briefly confirm what was applied (file list + 1-line description per fix).
 
@@ -307,16 +326,18 @@ Run the applicable verification layers:
 
 #### Phase 12: Stop condition check (always after each iteration)
 
-Stop and report final state when **any** of these holds:
+Stop and report final state when **any primary** stop condition holds. The ship-ready row at the bottom is **additive** — it never stops the workflow on its own, it only enriches a primary stop's final report when also satisfied.
 
-| Condition | Interpretation |
-|---|---|
-| All N instances report "NO HIGH ISSUES" | Full convergence — file is clean |
-| At least `(N − threshold + 1)` instances report "NO HIGH ISSUES" (default: ≥2 of 3 when N=3 / threshold=2) | Practical convergence — even if every remaining instance flagged the same issue, it could not reach `threshold`, so no reproducible defect can remain |
-| HIGH avg plateau for 2 consecutive iterations (avg change < 1) | Structural limit reached — remaining issues are likely deliberate design / architectural tensions |
-| iteration ≥ `max_iterations` | Hard limit — report current state, flag the asymptote explicitly |
-| 0 fix candidates from Phase 6 | Nothing actionable left |
-| Phase 11.5(c) static.json reports `score == 1.0 AND warnings == 0` (SKILL.md target only, when Phase 2.5 ran) | Structurally ship-ready on the static layer; combine with practical convergence above for a "both layers clean" signal |
+| Condition | Type | Interpretation |
+|---|---|---|
+| All N instances report "NO HIGH ISSUES" | primary | Full convergence — file is clean |
+| At least `(N − threshold + 1)` instances report "NO HIGH ISSUES" (default: ≥2 of 3 when N=3 / threshold=2) | primary | Practical convergence — even if every remaining instance flagged the same issue, it could not reach `threshold`, so no reproducible defect can remain |
+| HIGH avg plateau for 2 consecutive iterations (avg change < 1) | primary | Structural limit reached — remaining issues are likely deliberate design / architectural tensions |
+| iteration ≥ `max_iterations` | primary | Hard limit — report current state, flag the asymptote explicitly |
+| 0 fix candidates from Phase 6 | primary | Nothing actionable left |
+| Phase 11.5(c) static.json reports `score == 1.0 AND warnings == 0` (SKILL.md target only, when Phase 2.5 ran) | additive | Structurally ship-ready on the static layer. When ALSO combined with full convergence or practical convergence above, report "both layers clean". Never a standalone stop: if no primary row holds, do not stop on this row alone, and conversely `warnings > 0` alone is not a stop reason either — only the absence of primary stop conditions is. |
+
+**Derivation of `(N − threshold + 1)` (practical-convergence row).** If `(N − threshold + 1)` instances independently report "NO HIGH ISSUES", then at most `threshold − 1` instances could still flag any given issue. Since the convergence rule requires `≥ threshold` instances to flag the same issue before it counts as a real defect, no reproducible defect can possibly remain — even in the worst case where every remaining instance flagged the same thing. For defaults `N=3 / threshold=2`, this is `≥ 2 of 3` reporting clean. This stop condition is target-type agnostic (applies to both `claude-md` and `skill-md` targets) — keep the derivation here rather than in target-specifics docs.
 
 Report the iteration history (Phase 5 tables across all iterations) so the user can see the trajectory.
 
@@ -328,10 +349,23 @@ Do not duplicate the prompt here. The single source of truth is `agents/auditor.
 
 ## Output format
 
-After all iterations complete, present a final report:
+After all iterations complete, present a final report. The **Run parameters** block is required — it lets the user verify which configuration produced the trajectory below, especially when defaults were overridden at Phase 2.
 
 ```
 ## Audit complete — final report
+
+### Run parameters
+
+| Parameter | Value |
+|---|---|
+| Target | `<target_file>` (type: `<target_type>`) |
+| Symptom | `<symptom>` (routine_override: `<true|false>`) |
+| N / threshold / max_iterations | `<N> / <threshold> / <max_iterations>` |
+| Phase 4 working threshold | `<working_threshold>` (`= threshold` unless C1 degradation fired on some iteration) |
+| Exclusions | `<count>` items applied (`<default_count>` from `references/<target_type>-specifics.md` + `<user_added_count>` user-added; full list in Phase 2 log) |
+| Phase 4 model | `<model_string>` |
+| ab_testing_enabled | `<true|false>` |
+| Iterations actually run | `<count>` of `<max_iterations>` max |
 
 ### Iteration trajectory
 
@@ -364,34 +398,20 @@ After all iterations complete, present a final report:
 
 ## Common pitfalls
 
-- **Skipping Phase 1 symptom interview** → routine audits run by default. Always run Phase 1 even if the user "seems to know what they want"; the symptom shapes scope and A/B decision
-- **Forgetting the exclusion list** → subagents re-flag intentional design every iteration; convergence never reaches. Always collect exclusions in Phase 2 with `references/<target>-specifics.md` pre-loaded defaults
-- **Skipping Phase 3 section purposes** → `fix-safety-checker.intent_preserved` becomes circular (judged by re-reading the section being changed)
-- **Batching all fix proposals into one question** → user rubber-stamps or rejects everything. One AskUserQuestion per fix
-- **Skipping Phase 11.5(a) re-verify** → "I applied 2 fixes, done" is premature. Without re-verification, you don't know if fixes actually changed convergence behavior
-- **Modifying the audit prompt to "improve" it** → breaks reproducibility. The 7 axes and exclusion section are load-bearing; touch only the placeholders
-- **Dispatching subagents serially** → wastes time. Always dispatch all N in one message with `run_in_background: true`
-- **Treating "below threshold" issues as fixable** → ≥ threshold is the bar. Below that, signal is too noisy to trust
-- **Skipping Phase 6.5 / 7 / 9 verification subagents** → ≥threshold convergence does not guarantee correctness. The 3 phases catch shared-misreading false positives, redundant rules, and unsafe fixes
-- **Letting Phase 9 verdict be overridden silently** → if `fix-safety-checker` returns UNSAFE, do not present that fix to the user unmodified
-- **Main-thread aggregation drift** → quietly downgrading subagent findings during Phase 5 defeats the purpose of multi-agent audit. Subagents read in fresh contexts; you read with accumulated session bias
-- **Refining a redundant rule instead of removing it** → honor Phase 7's REMOVE / SIMPLIFY classification
-- **Using single-proposal mode for substantive fixes** → forcing the user into "Apply / Skip / Modify (free text)" wastes their time. Use multi-option mode when the fix is substantive
-- **Retrying auto-mode-blocked Edits blindly** → without explicit AskUserQuestion authorization, the classifier blocks every retry. Follow the `references/claude-md-specifics.md` playbook
-- **Ignoring `rule_burden_impact: INCREASES_MAJOR`** → adding rules has real cost. Surface major increases in the AskUserQuestion description, do not bury
-- **Running routine without symptom** → Phase 1 emits a warning; honor it. Routine use of this skill is anti-pattern — the asymptote means the same findings recur and waste tokens
-- **Treating cross-skill references as automatic defects (SKILL.md target)** → if the SKILL.md inlines the load-bearing content AND points to the canonical source as a courtesy, that is not a defect
+See `references/pitfalls.md` for the grouped list (workflow / aggregation / fix-proposal / target-specific). Consult it when a phase isn't behaving as expected or when onboarding.
 
 ## Cost notes
 
 Cost scales with `N`, `max_iterations`, and the number of REAL fix candidates that survive Phase 6.5/7.
 
-| Tier | N / threshold | Per-iteration cost (approx) | When to use |
-|---|---|---|---|
-| Quick (default) | 3 / 2 | ~150k tokens | Symptom-driven diagnostic; standard event-driven use |
-| Standard | 5 / 3 | ~280k tokens | When N=3 convergence feels weak |
-| Deep (opt-in) | 9 / 4 | ~440k tokens | Pre-shipping check on a high-leverage instruction file, or when N=3 / 5 didn't converge |
+| Tier | N / threshold | Phase 4 audit dispatch (approx, Sonnet-pinned) | Verification overhead per iteration (Phase 6.5/7/9, parent model) | When to use |
+|---|---|---|---|---|
+| Quick (default) | 3 / 2 | ~150k tokens | +20–80k tokens (scales with fix candidate count) | Symptom-driven diagnostic; standard event-driven use |
+| Standard | 5 / 3 | ~280k tokens | +20–80k tokens | When N=3 convergence feels weak |
+| Deep (opt-in) | 9 / 4 | ~440k tokens | +20–80k tokens | Pre-shipping check on a high-leverage instruction file, or when N=3 / 5 didn't converge |
 
-Multiply by `max_iterations` (default 3) for the full audit budget. Phase 11.5(b) A/B benchmark roughly doubles the per-iteration cost when enabled (since it runs skill-eval on the user-supplied task set before and after).
+**Parent-model multiplier.** Phase 4 is Sonnet-pinned but Phases 6.5/7/9 inherit the parent model. At an Opus parent session, verification overhead is priced at Opus rates, so a Quick-tier iteration with 3 fix candidates totals roughly 250–300k tokens (150k audit + ~100–150k verification at Opus), not 150k. Multiply that by `max_iterations` (default 3) for the full audit budget. Phase 11.5(b) A/B benchmark roughly doubles the per-iteration cost when enabled (it runs skill-eval on the user-supplied task set before and after).
+
+**Numbers are inferred, not measured.** The "+20–80k" verification range and the Opus 1.5–2× multiplier are derived from per-phase prompt size estimates, not from logged Phase 6.5/7/9 token counts in actual runs. Adjust based on observed token usage from your own audits — if you have data, update this table.
 
 Surface the estimated total cost at Phase 2 so the user can downsize before dispatch. The cost is justified when the file is high-leverage (loaded into every Claude session) and an event-driven symptom triggered the audit. For routine maintenance, the cost is not justified — this skill is the wrong tool for that use case.

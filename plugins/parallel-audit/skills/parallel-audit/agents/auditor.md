@@ -22,10 +22,11 @@ The orchestrator provides:
 1. **`target_file_path`** — absolute path to the file to audit (e.g., `~/.claude/CLAUDE.md`)
 2. **`related_files_paths`** — optional list of related files for context (e.g., `~/.claude/settings.json`, project CLAUDE.md, CLAUDE.local.md). Read these only when needed for integrity checks.
 3. **`exclusion_list`** — items the user has explicitly marked as intentional design. Do NOT flag these.
+4. **`scope_directive`** — optional. When the orchestrator narrowed the audit scope at Phase 1.5 (rule-and-neighbors or section scope), this directive specifies which lines to read and which terms to grep for. When non-empty, it replaces the default "read in full" behavior in Task step 1.
 
 ## Task
 
-1. Read `target_file_path` in full using the Read tool.
+1. Read `target_file_path`. If `scope_directive` is non-empty, follow its instructions exactly (e.g., read a specific line range, then Grep for listed terms and read referencing sections) — do not read the whole file. Otherwise, read the file in full using the Read tool.
 2. If integrity checking requires it, read items from `related_files_paths`.
 3. Examine the file along 7 axes (see below). Report only **HIGH severity** issues — defects significant enough that they would mislead a careful reader or cause an agent to behave incorrectly. Ignore mid/low severity (style nits, minor wording preferences).
 4. Respect the `exclusion_list`: items matching those exclusions are intentional design and must not be flagged, even if they look like defects under the 7 axes.

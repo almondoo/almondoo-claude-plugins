@@ -24,7 +24,7 @@ Phase 6.5 `false-positive-detector` should be aware of these patterns for CLAUDE
 - **Auditors flag a documented override as a CLAUDE.md violation** → FALSE (covered by exclusion default 2)
 - **Auditors flag dual-layer enforcement as redundancy / contradiction** → FALSE (covered by exclusion defaults 3 and 4)
 - **Auditors flag a rule citing `permissions.deny` as "undefined term"** → FALSE (covered by exclusion default 5)
-- **Auditors flag the user's `(N − threshold + 1)` formula as "missing rationale"** → KNOWN ASYMPTOTE; the rationale is "if threshold−1 instances remain, no reproducible defect can be flagged regardless of what they say". This is mathematically correct but auditors repeatedly fail to derive it. Consider adding the derivation inline rather than removing the rule
+- **Auditors flag the practical-convergence row `(N − threshold + 1)` as "missing rationale"** → FALSE — the derivation is inlined at SKILL.md Phase 12 "Derivation" note. If the auditor read the file in full they had the rationale and missed it.
 
 ## Phase 11 auto-mode classifier playbook
 
