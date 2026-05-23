@@ -111,6 +111,21 @@
         {"text": "The executor recognizes that settings.json is JSON config, not the markdown instruction-file target type parallel-audit handles (the 7 axes assume prose)", "kind": "behavioral"},
         {"text": "The executor explains the scope mismatch and either reviews permissions.deny / permissions.allow directly or suggests a more appropriate tool — does not silently run parallel-audit just because the user said 'convergence audit'", "kind": "behavioral"}
       ]
+    },
+    {
+      "id": 8,
+      "name": "claude-md-deep-tier-n9-opt-in",
+      "prompt": "this CLAUDE.md is the foundation of my entire workflow — i want a really thorough audit before i ship the next batch of changes. go deep: use N=9 / threshold=4 instead of the defaults. cost is fine, i'd rather pay than miss a contradiction",
+      "expected_output": "Phase 1 symptom interview triggers; user picks 'post-refactor' or similar non-routine symptom. Phase 2 confirms target=~/.claude/CLAUDE.md, target_type=claude-md, with the user-overridden N=9 / threshold=4 / max_iterations=3 — the Deep tier the user explicitly opted into (not the Quick default 3/2/3). Phase 2 surfaces the Deep tier cost estimate (~440k audit dispatch + verification overhead per iter × max_iterations) before the user confirms. Phase 4 dispatches exactly 9 sonnet subagents in a single tool-call message with run_in_background=true. Phase 5 Table B uses ≥4 threshold for convergent-issue classification. Phase 12 practical-convergence row computes ≥(9-4+1)=≥6 of 9 reporting clean. Phase 12 Run parameters table reports the user's N=9 / threshold=4 (not the default 3/2).",
+      "files": [],
+      "assertions": [
+        {"text": "Phase 2 captures the user's explicit N=9 / threshold=4 override (does not silently apply defaults 3/2 just because they are the most common)", "kind": "behavioral"},
+        {"text": "Phase 2 cost estimate explicitly surfaces the Deep tier line (~440k Phase 4 audit dispatch + verification overhead at parent rate) before the user confirms", "kind": "behavioral"},
+        {"text": "Phase 4 dispatches exactly N=9 subagents in a single tool-call message with run_in_background: true and model: \"sonnet\"", "kind": "behavioral"},
+        {"text": "Phase 5 Table B counts an issue as convergent when ≥4 instances flag it (≈44%, not the default 67% bar at N=3/threshold=2)", "kind": "behavioral"},
+        {"text": "Phase 12 practical-convergence row evaluates ≥(9-4+1)=≥6 of 9 reporting 'NO HIGH ISSUES' (not the default ≥2 of 3)", "kind": "behavioral"},
+        {"text": "Phase 12 Run parameters table reports the user-overridden N=9 / threshold=4, not the default 3/2 — so the trajectory is reproducible at the deep tier", "kind": "behavioral"}
+      ]
     }
   ]
 }

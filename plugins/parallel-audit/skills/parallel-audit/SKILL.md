@@ -80,10 +80,10 @@ Defaults shown. Phase 2 asks the user to confirm or override.
 
 Why these defaults?
 
-- **`threshold = 2` (≥2/3 ≈ 67%)** — chosen over majority (50%) and supermajority (75%). At 67% (≥2/3), one missed-by-one-auditor real defect is still recovered by the other two. Moving to 75% (e.g., `N=4 / threshold=3`) requires three auditors to independently converge on the same true positive — too restrictive for genuine HIGH-severity prose defects given inter-instance variance. Moving down to 50% (e.g., `N=4 / threshold=2`) re-admits single-pair false positives that the multi-agent design was built to filter. Note: the 67% framing anchors on default `N=3`. At opt-in `N=5 / threshold=3` the bar is 60%, and at `N=9 / threshold=4` it is 44% — deeper tiers buy redundancy (more independent corroborators in absolute count), not stricter percentage agreement.
+- **`threshold = 2` (≥2/3 ≈ 67%)** — chosen over majority (50%) and supermajority (75%) framings on the default `N=3` tier. At 67% (≥2/3), one missed-by-one-auditor real defect is still recovered by the other two. Pushing to a hypothetical 75% framing would require three of four auditors to independently converge on the same true positive — too restrictive for genuine HIGH-severity prose defects given inter-instance variance. Loosening to a 50% framing re-admits single-pair false positives that the multi-agent design was built to filter. Note: the 67% framing anchors on default `N=3`. At opt-in `N=5 / threshold=3` the bar is 60%, and at `N=9 / threshold=4` it is 44% — deeper tiers buy redundancy (more independent corroborators in absolute count), not stricter percentage agreement.
 - **`N = 3`** — minimum N for ≥2 to be meaningful (2/2 is unanimous; 2/3 is convergence). Higher N (5, 9) buys statistical power but multiplies cost and rarely changes the convergent-issue set for files under ~500 lines.
 - **`max_iterations = 3`** — empirically observed asymptote (see Positioning section). Iterations 4+ tend to produce diminishing real defects and increasing noise from previously-discussed exclusions.
-- **`model_string = "sonnet"`** — Phase 4 is the only place this skill overrides parent-model inheritance. The ≥threshold aggregation absorbs per-instance noise, so Sonnet's HIGH-severity prose detection quality suffices at much lower per-token rates than Opus. Phases 6.5/7/9 still inherit the parent model since each is a single-agent evaluation with no aggregation buffer.
+- **`model_string = "sonnet"`** — Phase 4 is the only place this skill overrides parent-model inheritance. The ≥threshold aggregation absorbs per-instance noise, so Sonnet's HIGH-severity prose detection quality should suffice at much lower per-token rates than Opus. *This choice is inferred from per-task fan-out economics, not empirically benchmarked* — if you observe Sonnet missing convergent defects in your runs, override `model_string` at Phase 2 to a more capable model. Phases 6.5/7/9 still inherit the parent model since each is a single-agent evaluation with no aggregation buffer.
 
 ## Workflow
 
@@ -131,6 +131,7 @@ Use **AskUserQuestion** to collect:
 3. **Confirm `N` / `threshold` / `max_iterations`** — defaults `3 / 2 / 3`. Offer an "opt into deep audit (N=5 or N=9)" option for cases where the user wants stronger convergence; show the per-iteration cost estimate for each tier
 4. **Exclusions** — pre-load defaults from `references/<target_type>-specifics.md`. Present as multi-select for deselection, accept free-text additions for skill-specific intentional design
 5. **A/B testing** — `ab_testing_enabled`? Default `false`. Show `references/ab-testing.md` cost estimate (typically doubles iteration cost) so the user can decide
+6. **`model_string` override** (only when the user wants version-pinned reproducibility — usually skip and let default `"sonnet"` resolve at dispatch time). AskUserQuestion supports free-text via its built-in "Other" option, so present an AskUserQuestion with a small set of fixed candidates (the default `"sonnet"`, the current Sonnet generation ID, the current Opus generation ID if the user wants stricter detection) and let the user type a custom model ID via "Other" if needed. Capture the resulting string and pass to Phase 4 dispatch unchanged.
 
 The exclusion list is critical — without it, subagents will repeatedly flag intentional design as "issues" and convergence will never be reached.
 
@@ -178,7 +179,7 @@ Critical requirements:
 
 **Failure handling for partial returns**: subagents can time out, return malformed (non-table) output, or never complete. Track the number of instances that returned parseable HIGH-issue output (`N_received`) versus dispatched (`N_dispatched`). If `N_received < N_dispatched`:
 
-- Adjust the working threshold for this iteration to `max(2, ceil(N_received × threshold / N_dispatched))` so the convergence math is not broken by silent drop-outs. Never go below 2 — a single auditor's report is not "convergence". Trade-off: this keeps the *percentage* convergence threshold roughly stable but lowers the *absolute count* of corroborators. If your bar is the absolute count (e.g., "I require at least 4 independent flags before I act"), the alternative policy is to abort the iteration entirely on any drop-out and re-dispatch with a fresh N. The proportional formula is the default to keep audits from stalling on transient failures; switch to the abort-and-redispatch policy when count-based convergence is non-negotiable.
+- Adjust the working threshold for this iteration to `max(2, ceil(N_received × threshold / N_dispatched))` so the convergence math is not broken by silent drop-outs. Never go below 2 — a single auditor's report is not "convergence". Trade-off: this lowers the *absolute count* of corroborators (e.g., `N=9 / threshold=4 / N_received=6` drops to working_threshold=3 — 3 of 6 instead of 4 of 9). The *percentage* threshold can drift in either direction depending on the rounding (e.g., 44% → 50% in the above case, but 60% → 67% in `N=5 / threshold=3 / N_received=3`). If your bar is the absolute count (e.g., "I require at least 4 independent flags before I act"), the alternative policy is to abort the iteration entirely on any drop-out and re-dispatch with a fresh N. The proportional formula is the default to keep audits from stalling on transient failures; switch to the abort-and-redispatch policy when count-based convergence is non-negotiable.
 - If `N_received < 2`, abort the iteration and report the degradation to the user before re-dispatching or stopping. Single-instance results are noise, not signal.
 - Surface degradation explicitly in Table A by adding a row `N_dispatched=X, N_received=Y, working_threshold=Z` so the user sees that Phase 5 aggregation used a different threshold than the configured `threshold`. Pass the `working_threshold` (not the configured `threshold`) into the Phase 12 Run parameters report so the trajectory is reproducible.
 
@@ -206,6 +207,8 @@ For each distinct issue mentioned across instances, count how many instances fla
 
 **Aggregation drift hedge**: Do not unilaterally downgrade subagent verdicts. If you (the main thread) believe an issue at-or-above threshold is actually acceptable, do **not** quietly drop it — surface the disagreement to the user in Phase 6 triage. Main-thread session context biases toward agreement with the user (sycophancy gradient); subagents read in fresh contexts and their independent judgment is the trust anchor of this skill. If you find yourself softening a finding because "it doesn't feel like a defect", that's exactly the drift this hedge prevents — leave the call to the user.
 
+**Scope-narrowing observability (when scope ≠ full)**: if Phase 1.5 set a non-empty `scope_directive` (rule-and-neighbors or section scope), verify Phase 4 instances honored it before trusting aggregation. After all instances complete, compare per-instance input token count against the full-file token count baseline. If any instance's input tokens exceed 50% of the full-file size, that instance likely ignored the scope_directive and read the whole file — warn "scope_directive may not have been honored by instance #X" and surface the offending instance separately so the user can decide whether to re-dispatch it or accept its full-file findings. Without this check, the 1/3–1/5 per-instance token-reduction claim in Phase 1.5 is aspirational, not verified.
+
 ---
 
 ### Triage
@@ -222,26 +225,11 @@ If 0 fix candidates remain after this categorization, skip Phases 6.5, 7, 8, 9, 
 
 #### Phase 6.5: False-positive detection (when fix candidates exist)
 
-Read `agents/false-positive-detector.md` and dispatch one subagent (foreground, parent model inherited) with:
-
-- `target_file`: the audit target path
-- `related_files`: any project-level CLAUDE.md, CLAUDE.local.md, settings.json, etc.
-- `convergent_issues`: the fix candidates from Phase 6
-- `exclusion_list`: the current exclusion list (including any items added during this iteration)
-
-Filter out FALSE issues — they do not become fix proposals. For NEEDS_HUMAN issues, surface them to the user in Phase 10 with the agent's reasoning so the user can decide.
+Dispatch per the **Verification subagents** table (see below). Filter out FALSE issues — they do not become fix proposals. Surface NEEDS_HUMAN issues to the user in Phase 10 with the agent's reasoning.
 
 #### Phase 7: Redundancy classification (when REAL fix candidates remain)
 
-Read `agents/redundancy-checker.md` and dispatch one subagent (foreground, parent model inherited) with:
-
-- `target_file`: the audit target path
-- `target_type`: from Phase 2 — determines whether the checker compares against Claude Code defaults (`claude-md`) or sibling skills (`skill-md`)
-- `convergent_issues`: REAL fix candidates from Phase 6.5, with cited section text (line ± 10 lines)
-- `section_purposes`: from Phase 3
-- `sibling_skills`: only for `target_type == "skill-md"` — list of installed sibling skill names + descriptions. The orchestrator resolves these via the strategy in `references/skill-md-specifics.md` "Marketplace root detection"; if no marketplace layout is found, pass an empty list
-
-The subagent returns KEEP / SIMPLIFY / REMOVE per issue. Trust the classification, but if it returns REMOVE for a rule you (the main thread) believe has unique value, surface the disagreement to the user — same drift-hedge logic as Phase 5.
+Dispatch per the **Verification subagents** table. The returned KEEP / SIMPLIFY / REMOVE classification per issue feeds Phase 8 drafting; if the checker returns REMOVE for a rule you believe has unique value, surface the disagreement to the user per Phase 5 drift-hedge.
 
 ---
 
@@ -266,19 +254,7 @@ When in doubt, use multi-option mode. It shifts the decision from "do you agree 
 
 #### Phase 9: Fix safety check (before showing each fix to user)
 
-Read `agents/fix-safety-checker.md` and dispatch one safety-checker subagent **per fix** (or per option in multi-option mode) — spawn all such checkers in parallel within **one tool-call message** with `run_in_background: true`, parent model inherited. The orchestrator awaits all completions before proceeding to Phase 10 (each safety-check gates that fix's user approval question). Pass:
-
-- `target_file`: the audit target path
-- `issue_summary`: 1-2 lines describing the convergent issue this fix addresses
-- `proposed_fix`: before/after diff, rationale, Phase 7 classification
-- `section_purposes`: from Phase 3 (authoritative intent baseline; do not re-derive from file content)
-
-Verdict handling:
-
-- **SAFE** → present to user in Phase 10
-- **UNSAFE** → do NOT present this fix as-is. Re-draft addressing the concerns, or escalate with explicit warnings
-- **NEEDS_REVIEW** → present with trade-offs clearly stated in the AskUserQuestion description
-- **`rule_burden_impact: INCREASES_MAJOR`** → regardless of verdict, surface prominently. Adding rules has real cost
+Dispatch per the **Verification subagents** table (parallel, one safety-checker per fix or per option in multi-option mode). The orchestrator awaits all completions before Phase 10; each safety-check gates that fix's user approval question.
 
 #### Phase 10: User approval per fix
 
@@ -300,13 +276,19 @@ For each fix candidate, present via **AskUserQuestion**. One question per fix ca
 
 Include trade-off labels in option descriptions so the user sees why each option exists.
 
+**User-abort handling**:
+
+- **Modify withdrawn mid-response** (user starts entering alternative wording then cancels) → treat as Skip; add the original fix to the exclusion list and proceed to the next fix candidate.
+- **Cancel during a multi-fix sequence** (user explicitly halts in the middle of N fix candidates) → apply the fixes already approved this iteration, skip the remaining unanswered ones, and report them in Phase 12 as `<count> fixes deferred (user canceled)`. Do not silently drop deferred fixes — they appear in the iteration trajectory so the user remembers what's pending.
+- **Session timeout / orchestrator state loss** (no user response within the AskUserQuestion timeout, or the orchestrator restarts mid-Phase-10) → on resume, re-Read Phase 6 / Phase 7 outputs and re-present the remaining fixes from where the sequence stopped, not from scratch.
+
 ---
 
 ### Apply
 
 #### Phase 11: Apply via Edit (when fixes approved)
 
-**Pre-authorize when target is on the classifier trigger list.** For any `claude-md` target or installed `skill-md` target (see trigger-location tables in `references/claude-md-specifics.md` and `references/skill-md-specifics.md`), the classifier trigger is deterministic — issuing Edit first WILL block. **Do not issue Edit first.** Use **AskUserQuestion** immediately with the "Yes, update my `<file>`" template from the playbook, then issue Edit after the explicit authorization. If pre-authorization happens to not release the classifier on the first Edit attempt (the playbook documents release on retry after authorization), use the same authorization to retry. Either way, the user has already authorized — you have eliminated the "block → think → look up playbook → ask → answer" thinking round-trip that the reactive path costs.
+**Pre-authorize when target is on the classifier trigger list.** For any `claude-md` target or installed `skill-md` target (see trigger-location tables in `references/claude-md-specifics.md` and `references/skill-md-specifics.md`), the classifier trigger is deterministic — issuing Edit first WILL block. Ask for authorization BEFORE issuing Edit, using **AskUserQuestion** with the "Yes, update my `<file>`" template from the playbook. **The classifier's exact release semantics on prior pre-authorization (vs the documented "release on retry after authorization" path) have not been empirically verified by this skill** — treat the pre-authorize variant as best-effort. If the first Edit still blocks despite prior authorization, retry once with the same authorization in context; the playbook's documented retry release applies. If the second Edit also blocks, fall back to the standard reactive playbook flow. Either way, asking first eliminates the "block → think → look up playbook → ask → answer" thinking round-trip that the purely reactive path costs.
 
 For targets NOT on the trigger list, just use **Edit** directly. If the classifier still blocks (rare), fall back to the playbook in `references/claude-md-specifics.md` reactively — it owns the canonical trigger-location table and the "Yes, update my `<file>`" authorization template. For SKILL.md location nuances (marketplace source vs installed), see `references/skill-md-specifics.md` "Phase 11 location-aware classifier behavior".
 
@@ -347,6 +329,16 @@ The audit prompt lives in `agents/auditor.md`. Phase 4 reads that file and uses 
 
 Do not duplicate the prompt here. The single source of truth is `agents/auditor.md`. Editing the prompt means editing that file.
 
+## Verification subagents
+
+Phase 6.5, 7, and 9 each dispatch a specialized verification subagent. Dispatch shape, inputs, and verdict handling are consolidated here so each Phase section can stay short.
+
+| Phase | Agent prompt file | Dispatch | Inputs | Verdict handling |
+|---|---|---|---|---|
+| 6.5 | `agents/false-positive-detector.md` | 1 subagent, foreground, parent model | `target_file`; `related_files` (project CLAUDE.md / settings.json / etc.); `convergent_issues` (fix candidates from Phase 6); `exclusion_list` (current, including items added this iteration) | REAL → forward to Phase 7. FALSE → drop. NEEDS_HUMAN → surface in Phase 10 with agent reasoning. |
+| 7 | `agents/redundancy-checker.md` | 1 subagent, foreground, parent model | `target_file`; `target_type` (selects upstream-reference set: Claude Code defaults for `claude-md`, sibling skills for `skill-md`); `convergent_issues` (REAL from Phase 6.5, with cited section text ±10 lines); `section_purposes` (from Phase 3); `sibling_skills` for `skill-md` only — resolution chain (in order, first non-empty wins): (1) walk up parent dirs ≤6 levels for `.claude-plugin/marketplace.json` then glob `<marketplace_root>/plugins/*/skills/*/SKILL.md`, (2) installed-plugin cache `~/.claude/plugins/cache/<marketplace>/*/skills/*/SKILL.md`, (3) all-marketplaces cache fallback, (4) `SKILL_EVAL_SKILLS_DIR` env-var glob, (5) user-supplied manual list at Phase 2, (6) empty fallback (Phase 7 still compares against `skill-creator` as the always-relevant authority). Full details in `references/skill-md-specifics.md` Marketplace root detection. | Returns KEEP / SIMPLIFY / REMOVE per issue, used by Phase 8 to choose draft mode. |
+| 9 | `agents/fix-safety-checker.md` | 1 subagent per fix candidate (or per option in multi-option mode), parallel in a **single tool-call message** with `run_in_background: true`, parent model | `target_file`; `issue_summary` (1-2 lines); `proposed_fix` (before/after diff + rationale + Phase 7 classification); `section_purposes` (from Phase 3 as authoritative intent baseline — do not re-derive from file content) | SAFE → present in Phase 10. UNSAFE → re-draft addressing concerns **once**, then re-run safety-check; if second pass also UNSAFE, escalate to user (present original in Phase 10 with safety reasoning as explicit warning, let user choose Apply / Skip / Modify). NEEDS_REVIEW → present with trade-offs in AskUserQuestion description. `rule_burden_impact: INCREASES_MAJOR` → surface prominently regardless of verdict. |
+
 ## Output format
 
 After all iterations complete, present a final report. The **Run parameters** block is required — it lets the user verify which configuration produced the trajectory below, especially when defaults were overridden at Phase 2.
@@ -360,6 +352,7 @@ After all iterations complete, present a final report. The **Run parameters** bl
 |---|---|
 | Target | `<target_file>` (type: `<target_type>`) |
 | Symptom | `<symptom>` (routine_override: `<true|false>`) |
+| Scope | `<full | section: <section-name> | rule-and-neighbors: <rule>>` (from Phase 1.5) |
 | N / threshold / max_iterations | `<N> / <threshold> / <max_iterations>` |
 | Phase 4 working threshold | `<working_threshold>` (`= threshold` unless C1 degradation fired on some iteration) |
 | Exclusions | `<count>` items applied (`<default_count>` from `references/<target_type>-specifics.md` + `<user_added_count>` user-added; full list in Phase 2 log) |
