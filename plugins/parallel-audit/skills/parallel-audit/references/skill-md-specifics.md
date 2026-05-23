@@ -27,9 +27,9 @@ Phase 6.5 `false-positive-detector` should be aware of these patterns for SKILL.
 
 ## Phase 2.5: Pre-audit static check
 
-Before the main audit, run `skill-eval`'s `static_check.py` on the target SKILL.md.
+Before the main audit, run `skill-eval`'s `static_check.py` on the target SKILL.md — **only if `skill-eval` is installed as an external dependency**. `skill-eval` is NOT bundled in this marketplace (`almondoo-claude-plugins`); the integration is preserved as an optional capability for users who have installed `skill-eval` from a different source.
 
-### Purpose (three roles)
+### Purpose (three roles, when skill-eval IS available)
 
 1. **Hard-fail gate** — if the static check returns `hard_fail: true` (e.g., missing frontmatter, invalid YAML), abort the audit and surface the static evidence to the user. Multi-agent prose audit on a structurally broken SKILL.md wastes tokens.
 2. **De-duplicates work** — the static axes (frontmatter validity, body line count, MUST/NEVER density, emoji, progressive disclosure, reference integrity) cover the structural domain. Pre-running and passing the `static.json` to Phase 4 auditors via the exclusion list hardens the delegation: auditors get the static result as context and explicitly do not re-flag those axes.
@@ -41,11 +41,22 @@ Before the main audit, run `skill-eval`'s `static_check.py` on the target SKILL.
 python3 <skill-eval-path>/scripts/static_check.py <target_skill_dir> --out <workspace>/iteration-0/static.json
 ```
 
-`<skill-eval-path>` is the absolute path to the installed `skill-eval` skill directory. The orchestrator resolves this via the standard plugin layout (`~/.claude/plugins/cache/<marketplace>/skill-eval/...`) or by glob.
+### Resolving `<skill-eval-path>` (try in order, take first hit)
+
+The orchestrator attempts these paths in order. Stop at the first one that has `scripts/static_check.py`:
+
+1. **User-provided path**: if the user passed `skill_eval_path` explicitly at Phase 2, use it. Skip remaining steps.
+2. **`SKILL_EVAL_PATH` env var**: if `SKILL_EVAL_PATH` is set to a directory containing `scripts/static_check.py`, use it. This is the persistent override path for users who have skill-eval source in a known location outside marketplace cache.
+3. **Marketplace cache (current marketplace)**: glob `~/.claude/plugins/cache/<current-marketplace>/skill-eval/skills/skill-eval/scripts/static_check.py` — resolves if skill-eval is added to the current marketplace.
+4. **Marketplace cache (any marketplace)**: glob `~/.claude/plugins/cache/*/skill-eval/skills/skill-eval/scripts/static_check.py` — picks up skill-eval if installed via a different marketplace.
+5. **PATH-resolved**: check if `static_check.py` is on the user's PATH (rare; only if skill-eval has been installed as a binary).
+6. **Not found**: log the warning below and skip Phase 2.5.
+
+> **Do not look in `tmp/`**. The `tmp/skill-eval/...` path holds skill-eval's own evaluation workspace artifacts (iteration-N/ output), not source code. Source must come from an installed plugin location or the explicit `SKILL_EVAL_PATH` env var.
 
 ### Fallback when skill-eval is not available
 
-Log a one-line warning ("Phase 2.5 skipped — `skill-eval` not installed; structural axes will not be pre-cleared from the prose audit") and proceed to Phase 3. The audit still works without Phase 2.5; the de-duplication advantage is lost but auditors will still find real prose defects.
+Log a one-line warning ("Phase 2.5 skipped — `skill-eval` not available at any of the resolved paths; structural axes will not be pre-cleared from the prose audit, but the prose audit itself proceeds normally") and proceed to Phase 3. The audit still works without Phase 2.5; the de-duplication advantage is lost but auditors will still find real prose defects.
 
 ## Phase 11 location-aware classifier behavior
 
@@ -76,10 +87,30 @@ If Phase 2.5 was skipped (skill-eval not available), skip Phase 11.5(c) too — 
 
 When `target_type == "skill-md"`, Phase 7 redundancy-checker asks "is this rule duplicated by a sibling skill?". To answer, the main thread needs to know which sibling skills are installed.
 
-Resolution strategy (try in order):
+### Resolution strategy (try in order; first successful path wins)
 
-1. If `target_file` is inside `plugins/<name>/skills/<name>/SKILL.md` under a path that has `.claude-plugin/marketplace.json` at the root, glob `<marketplace_root>/plugins/*/skills/*/SKILL.md` and read each frontmatter for `name` + `description`.
-2. If no marketplace root is found, glob `~/.claude/plugins/cache/*/<*>/skills/*/SKILL.md` for installed plugin skills.
-3. If both fail, pass an empty `sibling_skills` list to the redundancy-checker. The checker will only compare against `skill-creator` and `skill-eval` (always-relevant authorities), not sibling skills.
+Concrete fallback chain — each step is independent and the orchestrator stops at the first one that produces a non-empty sibling list.
 
-Document the resolution outcome in the iteration log so the user can see whether sibling comparison was active or not.
+1. **Source-marketplace globbing** — assume `target_file` is inside a marketplace source layout. Walk up parent directories from `target_file` (max 6 levels up) looking for a `.claude-plugin/marketplace.json` file. If found, use that directory as `<marketplace_root>` and glob `<marketplace_root>/plugins/*/skills/*/SKILL.md`. Read each frontmatter's `name` + `description`. Exclude the audit target itself from the list.
+2. **Installed-plugin globbing (current marketplace)** — glob `~/.claude/plugins/cache/<current-marketplace>/*/skills/*/SKILL.md`. If `<current-marketplace>` is unknown (e.g., the user invoked the skill outside a marketplace context), substitute `*` and accept any matched installed plugin.
+3. **Installed-plugin globbing (all marketplaces)** — fallback to `~/.claude/plugins/cache/*/*/skills/*/SKILL.md`. This may return many results across user-installed marketplaces; deduplicate by `name` and prefer first-seen.
+4. **`SKILL_EVAL_SKILLS_DIR` env var** — if the user has set `SKILL_EVAL_SKILLS_DIR=/path/to/installed/skills`, glob that path for `**/SKILL.md`. This is the explicit user override path.
+5. **Manual list** — accept a user-provided `sibling_skills` list at Phase 2 (the user pastes `name + description` pairs in free text). Useful when the user knows exactly which siblings matter and wants to bypass discovery.
+6. **Empty list fallback** — if all of the above produce nothing, pass an empty `sibling_skills` list to the redundancy-checker. The checker still compares against the upstream authority `skill-creator` (which is broadly assumed available); the per-marketplace sibling comparison is just lost.
+
+### Always-relevant authorities (no discovery needed)
+
+Regardless of discovery outcome, the redundancy-checker always compares against:
+
+- **`skill-creator`** (the canonical SKILL.md authoring authority — patterns, anatomy, writing style). Comparison treats this as an upstream rule source even if not explicitly in `sibling_skills`.
+- **`skill-eval`** *only if it was successfully resolved at Phase 2.5* (above). If skill-eval was not resolved, do not compare against it as an authority since the user has not installed it and the assumption that rules are "duplicated by skill-eval" would not be actionable for the reader.
+
+### Logging the outcome
+
+Document the resolution outcome in the iteration log:
+
+- `sibling_discovery: source-marketplace | installed-current | installed-all | env-var | manual | empty-fallback`
+- `siblings_found: <count>`
+- `siblings_sources: [<marketplace_root> | <env_var_value> | <manual> | <list of cache paths>]`
+
+So the user can see whether sibling comparison was active or not, and which strategy produced the list.

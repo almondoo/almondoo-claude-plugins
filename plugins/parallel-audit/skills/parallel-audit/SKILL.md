@@ -73,7 +73,8 @@ Defaults shown. Phase 2 asks the user to confirm or override.
 | `max_iterations` | 3 | Hard upper bound on audit→fix→verify cycles. Reflects the empirically observed asymptote |
 | `exclusions` | (asked, with target-type defaults pre-loaded) | Items the user does NOT want re-flagged. See `references/<target>-specifics.md` for pre-loaded defaults |
 | `section_purposes` | (drafted then asked in Phase 3) | Map from each section heading to its 1-line purpose; established once per audit and reused across iterations |
-| `ab_testing_enabled` | `false` | Whether Phase 11.5(b) runs a `skill-eval` A/B benchmark after fixes. Opt-in only; see `references/ab-testing.md` |
+| `ab_testing_enabled` | `false` | Whether Phase 11.5(b) runs a `skill-eval` A/B benchmark after fixes. Opt-in only; requires `skill-eval` to be installed separately (it is not bundled in this marketplace). See `references/ab-testing.md` |
+| `model_string` | `"sonnet"` | The string passed as the Agent tool's `model` parameter for Phase 4 parallel auditors. Default `"sonnet"` resolves to the current Sonnet generation at dispatch time. The user may override at Phase 2 by specifying a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility across an audit |
 
 ## Workflow
 
@@ -126,9 +127,11 @@ The exclusion list is critical — without it, subagents will repeatedly flag in
 
 #### Phase 2.5: Static pre-check (SKILL.md target only, when `skill-eval` is available)
 
-Per `references/skill-md-specifics.md`, if `target_type == "skill-md"` and the `skill-eval` skill is installed, run its `static_check.py` and capture the result. This (a) hard-fails the audit if the SKILL.md is structurally broken, (b) gives Phase 4 auditors a baseline of structural axes already covered so they don't re-flag them, and (c) calibrates Phase 2 defaults for short / long SKILL.md bodies.
+Per `references/skill-md-specifics.md`, if `target_type == "skill-md"` AND the `skill-eval` skill is installed AS AN EXTERNAL DEPENDENCY, run its `static_check.py` and capture the result. This (a) hard-fails the audit if the SKILL.md is structurally broken, (b) gives Phase 4 auditors a baseline of structural axes already covered so they don't re-flag them, and (c) calibrates Phase 2 defaults for short / long SKILL.md bodies.
 
-If `target_type == "claude-md"` or `skill-eval` is not available, skip Phase 2.5 entirely.
+**Important**: `skill-eval` is NOT bundled in this marketplace (`almondoo-claude-plugins`). The integration is preserved as an optional capability: if the user has installed `skill-eval` from a different source (or has its source available on disk), the orchestrator can invoke it. If not installed, Phase 2.5 is **skipped without error** (log a one-line warning "Phase 2.5 skipped — `skill-eval` not available; structural axes will not be pre-cleared from the prose audit"). Resolution strategy for the skill-eval path is documented in `references/skill-md-specifics.md`.
+
+If `target_type == "claude-md"`, skip Phase 2.5 entirely (the structural-axis delegation is SKILL.md-specific).
 
 #### Phase 3: Section purposes baseline (always)
 
@@ -153,7 +156,12 @@ Read `agents/auditor.md` and use its full content as the prompt for each subagen
 
 Dispatch all `N` subagents in **one tool-call message** with `run_in_background: true`, `subagent_type: general-purpose`, and `model: "sonnet"`.
 
-The `model: "sonnet"` value: pass the literal string `"sonnet"` — the Agent tool resolves this alias to the current Sonnet generation available in the harness. If the user wants version-pinned reproducibility across the audit, pass the full model ID instead (e.g., `claude-sonnet-4-6`). If the orchestrating parent model is already Sonnet, the override is effectively a no-op but the explicit `model` parameter is still required (do not omit it — the documented dispatch shape is uniform regardless of parent model).
+The `model: "sonnet"` value comes from the `model_string` configuration parameter (default `"sonnet"`). **Decision policy**:
+
+- **Default path**: Phase 2 leaves `model_string` at `"sonnet"` — the Agent tool resolves the alias to the current Sonnet generation available in the harness. Phase 4 dispatches with this string.
+- **User override path**: at Phase 2's parameter confirmation step, the user may override `model_string` to a full model ID (e.g., `"claude-sonnet-4-6"`) for version-pinned reproducibility across the audit. The orchestrator surfaces this option as part of the standard Phase 2 AskUserQuestion (the same question that confirms `N` / `threshold` / `max_iterations`).
+- **Parent-is-Sonnet case**: if the orchestrating parent model is already Sonnet, passing `"sonnet"` to Phase 4 subagents is effectively a no-op but the explicit `model` parameter is still required. Do not omit it — the documented dispatch shape is uniform regardless of parent model.
+- **Re-dispatches** (Phase 11.5(a) re-verify): use the same `model_string` value as iteration 1 for consistency. If the user did not override at Phase 2, all iterations use the same `"sonnet"` alias resolution at their respective dispatch times.
 
 Critical requirements:
 
@@ -240,10 +248,14 @@ Read the target file with Read to verify current line numbers and content before
 
 **Draft mode — single vs. multi-option**
 
-For each fix, choose drafting mode by scope:
+For each fix, choose drafting mode by scope using these criteria in order:
 
-- **Single-proposal mode** (default): the fix is **trivial** — ≤3 lines changed, no structural change, no choice between substantially different approaches. Draft one before/after diff
-- **Multi-option mode**: the fix is **substantive** — more than 3 lines changed, OR the fix restructures a rule, OR there's a meaningful choice between approaches (e.g., delete vs. compress vs. keep-with-refinement). Draft 2-3 alternative before/after options, each labeled with its trade-off
+1. **Lines-changed definition**: count lines as `max(before_text_line_count, after_text_line_count)` (i.e., the larger of "lines deleted" and "lines added"). A pure 2-line wording tweak counts as 2; a fix that replaces 4 lines with 1 counts as 4; a fix that adds 5 new lines to a previously empty position counts as 5.
+2. **Structural-change precedence**: if the fix **restructures a rule** (re-orders, splits, merges, or repositions it across sections), it is **always substantive regardless of lines-changed count** — even a 1-line restructure (e.g., moving a single bullet into a different section). Use multi-option mode.
+3. **Choice precedence**: if there is a **meaningful choice between approaches** (e.g., delete vs. compress vs. keep-with-refinement, or two materially different wordings with different trade-offs), it is **always substantive regardless of lines-changed count**. Use multi-option mode.
+4. **Default by line count** (only if neither precedence rule above applies):
+   - **Single-proposal mode** when lines-changed ≤ 3: draft one before/after diff
+   - **Multi-option mode** when lines-changed > 3: draft 2-3 alternative before/after options, each labeled with its trade-off
 
 Multi-option mode shifts the decision from "do you agree with my fix?" to "which of these alternatives best fits your intent?" — giving the user more agency on substantive changes.
 
@@ -303,8 +315,8 @@ After all Edit calls, briefly confirm what was applied (file list + 1-line descr
 Run the applicable verification layers:
 
 - **11.5(a) Audit re-dispatch (always when fixes applied and iteration < max_iterations)** → re-dispatch N subagents (same prompt, with updated exclusion list if any added in Phase 10) and repeat Phases 4–6. If new fix candidates appear, run the full Phase 6.5–11 cycle. Phase 3 `section_purposes` are stable across iterations and re-passed unchanged unless the user explicitly says the section structure changed
-- **11.5(b) A/B benchmark (only when `ab_testing_enabled: true`)** → see `references/ab-testing.md`. Runs `skill-eval`'s with/without comparison on a user-supplied benchmark task set, before vs after the iteration's fixes. The skill does NOT automatically curate the task set — the user must provide it
-- **11.5(c) Static re-check (only when `target_type == "skill-md"` and Phase 2.5 ran)** → re-execute `skill-eval`'s `static_check.py` on the target. Result feeds the Phase 12 ship-ready stop criterion
+- **11.5(b) A/B benchmark (only when `ab_testing_enabled: true` AND `skill-eval` is installed externally)** → see `references/ab-testing.md`. Runs `skill-eval`'s with/without comparison on a user-supplied benchmark task set, before vs after the iteration's fixes. The skill does NOT automatically curate the task set — the user must provide it. If `skill-eval` is not available, Phase 11.5(b) is skipped with a warning even when `ab_testing_enabled: true` (the user opted in but the dependency is missing; surface this prominently so the user can install skill-eval and re-run, or accept the audit without A/B verification)
+- **11.5(c) Static re-check (only when `target_type == "skill-md"` and Phase 2.5 ran)** → re-execute `skill-eval`'s `static_check.py` on the target. Result feeds the Phase 12 ship-ready stop criterion. If Phase 2.5 was skipped (skill-eval unavailable), Phase 11.5(c) is automatically skipped too
 
 ---
 

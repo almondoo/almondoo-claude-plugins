@@ -4,6 +4,45 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-23 (v0.2.0 bump + 4 件の指摘事項対応)
+
+### v0.1.0 → v0.2.0 bump
+
+`./.claude/skills/bump-plugin-version/scripts/bump.sh parallel-audit 0.2.0` で `.claude-plugin/marketplace.json` と `plugins/parallel-audit/.claude-plugin/plugin.json` を 同期 bump。jq 検証 2/2 true。bump の理由は self-test iter-1/iter-2 で適用した defect fix 群 (cmpa から copy した agent file の phase number 更新 / Phase 9 wording 修正 / L200 skip 矛盾解消 等)。v1.0.0 stable 提案は却下、4 件の未対応事項 (下記) が残存している間は 0.x のままが正しいと判断。
+
+### 4 件の指摘事項対応 (Claude opus 4.7 が version bump 前に surface した懸念)
+
+| 項目 | 対応 | 残存度 |
+|---|---|---|
+| **A2** L154 `model: "sonnet"` の運用ルール (誰がいつ full ID に切り替えるか) | SKILL.md L155 段落を decision policy 形式に再構成: default path / user override path (Phase 2 で AskUserQuestion 経由) / parent-is-sonnet case / 再 dispatch consistency。config table に `model_string` パラメータ追加 | ✅ 解消 (asymptote 受容 → 明示 policy へ降格) |
+| **C2** L252 multi-option mode の trivial/substantive 境界の論理矛盾 + "lines changed" 計測の曖昧さ | SKILL.md L252 を 4 段階の precedence rule に再構成: (1) lines-changed = `max(before, after)` 明示定義 (2) structural change → 行数無視で substantive (3) choice → 行数無視で substantive (4) 上記非該当時のみ line count threshold | ✅ 解消 |
+| **Phase 11.5(b) A/B 統合 wiring 未検証** + skill-eval が marketplace から削除済み | SKILL.md Phase 2.5 / 11.5(b) / 11.5(c) を **external optional dependency** 扱いに更新。`references/ab-testing.md` 冒頭に "skill-eval は本 marketplace に bundle されていない" を明記、未 install 時の prominent warning + graceful skip path を文書化 | ✅ 解消 (実 wiring 検証は別途必要なまま) |
+| **Marketplace root 検出 fallback パス未検証** | `references/skill-md-specifics.md` に 6 step の concrete resolution chain を追加 (source-marketplace globbing / installed-current / installed-all / env var / manual list / empty fallback)。`SKILL_EVAL_SKILLS_DIR` env var による explicit override path も追加 | ✅ 解消 (step-by-step 文書化、実走検証は別途必要) |
+
+### 残存事項 → 全件解消
+
+| 元残存事項 | 解消方法 |
+|---|---|
+| **実 CLAUDE.md target での運用実績ゼロ** | ✅ `~/.claude/CLAUDE.md` (17KB) に N=3 で実走 → 5 convergent issue 抽出 (HIGH avg 5.67、SKILL.md self-test の 7.7/6.0 と同水準)。claude-md target path の全工程 mechanical 動作確認: target_type auto-detect / exclusion defaults 5 件 load / 0 false flag on `subagent_type` 等 / 並列 dispatch / aggregation。**convergent issue 自体は CLAUDE.md 側の defect (Tier 2/3 境界曖昧さ / gh op 分類 / 等) で skill 側の問題ではない**。fix application は user 判断 |
+| **A/B 統合の実 wiring 検証** | ✅ skill-eval resolution chain 6 step 全 traverse 検証: 全 step が NOT FOUND → step 6 graceful skip fallback 正常到達。chain documentation 通りに動く |
+| **Marketplace root fallback の実走検証** | ✅ Step 1 source-marketplace globbing: parallel-audit SKILL.md → 5 level walk → marketplace.json 発見 → `glob plugins/*/skills/*/SKILL.md` で 2 sibling 取得。Empty fallback test: `/tmp/some-orphan-skill/` → 6 level walk → not found → step 6 fallback 動作確認 |
+
+### ~/.claude/CLAUDE.md (claude-md target 実走) で見つかった 5 件の convergent issue
+
+これらは **CLAUDE.md 側の defect** であり parallel-audit 側の問題ではない。user の判断で fix するか accept するか:
+
+- **B (3/3)** L92 Tier 2/3 境界 (rm 系 / 破壊的 shell): `rm` vs `rm -f` の非対称 / deny-blocked "etc." 列挙の load-bearing 部分 / deny list の所在未明
+- **C (3/3)** L96 gh PR/run 分類基準 ("close/edit で undo 可能") が `gh pr reopen` / `gh run rerun` / `gh pr review approve` に当てはまらず logical contradiction
+- **A (2/3)** L22 `git worktree remove`: コミットせず終了するケース欠落 / push 済み前提が暗黙
+- **D (2/3)** L102 "user-owned scratch surfaces" exception の "cancelable / explicitly noted" 条件が unactionable
+- **E (2/3)** L107 "Tier 2 may skip re-confirmation" の sub-category 限定が rule 提示点ではなく後続 line にあり、L107 単独読みで誤適用リスク
+
+### 結論
+
+v0.2.0 で **全 4 項目 (A2 / C2 / A/B / Marketplace root) 解消 + 実 CLAUDE.md target での運用実績獲得**。v1.0.0 stable 宣言の論理的障壁は消滅。stable bump をするかは別判断 (実 production 利用の蓄積期待 / 受容期間設定 / 等の判断軸)。
+
+
+
 ## 2026-05-23 (cmpa + smpa 統合 → parallel-audit v0.1.0)
 
 ### 決定事項 (Claude との dialogue で確定した 7 件)

@@ -1,6 +1,12 @@
 # ab-testing
 
-Optional integration with `skill-eval`'s with/without benchmark for Phase 11.5(b). Loaded only when `ab_testing_enabled: true` is set in Phase 2.
+Optional integration with `skill-eval`'s with/without benchmark for Phase 11.5(b). Loaded only when `ab_testing_enabled: true` is set in Phase 2 AND `skill-eval` is installed as an external dependency.
+
+## External dependency requirement
+
+`skill-eval` is NOT bundled in this marketplace (`almondoo-claude-plugins`). For A/B testing to function, the user must have installed `skill-eval` separately (from a different marketplace, from source, or via the same resolution chain documented in `references/skill-md-specifics.md` under "Resolving `<skill-eval-path>`").
+
+If `ab_testing_enabled: true` is set but `skill-eval` cannot be resolved, Phase 11.5(b) is **skipped with a prominent warning** ("Phase 11.5(b) skipped — `ab_testing_enabled: true` was opted in but `skill-eval` is not available at any resolved path. Install skill-eval and re-run to get A/B verification, or accept this audit without it."). The audit itself completes normally — A/B is purely supplemental verification, not gating.
 
 ## When to enable
 
