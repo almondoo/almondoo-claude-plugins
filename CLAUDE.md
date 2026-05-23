@@ -48,13 +48,9 @@ Do not translate `docs/learnings/` to English. If you find English-only entries 
 
 ### Localization data inside scripts
 
-When a renderer / script intentionally produces user-facing output in multiple languages (for example, the `LOCALES` dict in `plugins/skill-eval/skills/skill-eval-viewer/scripts/render_html.py` carries `ja` and `en` copies of report labels), the non-English strings are **output data**, not source content. They are allowed inside the otherwise English-only file.
+When a renderer / script intentionally produces user-facing output in multiple languages (a `LOCALES` dict carrying `ja` and `en` copies of UI labels, for example), the non-English strings are **output data**, not source content. They are allowed inside the otherwise English-only file.
 
 The rule: surrounding code, comments, and identifiers stay English; only the literal string values in the language-keyed table may contain other languages. If a script grows enough localization data to feel like content rather than data, extract it into a separate `locales/` file rather than relaxing the rule.
-
-### Workspaces (not part of the plugin)
-
-`skill-eval` writes its evaluation artefacts to `tmp/skill-eval/<skill-name>/iteration-N/` under the project root — **never inside `plugins/`**, so installed plugins do not ship a per-target evaluation history. `tmp/` is gitignored at the marketplace root and by convention in user projects. The workspace's report.md / report.html language follows the user's prompt language; if you see one, do not "fix" its language.
 
 Verifying the rule:
 
@@ -65,4 +61,4 @@ find plugins -type f \( -name "*.md" -o -name "*.json" -o -name "*.py" -o -name 
   | xargs python3 -c "import sys; [print(p) for p in sys.argv[1:] if any('぀'<=c<='ヿ' or '一'<=c<='鿿' for c in open(p,encoding='utf-8').read())]"
 ```
 
-(Exception: the renderer's `LOCALES["ja"]` localization data block is expected to match — see the localization-data exception above.)
+(Exception: a `LOCALES["ja"]` localization data block is expected to match — see the localization-data exception above.)

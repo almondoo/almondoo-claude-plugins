@@ -1,0 +1,92 @@
+{
+  "skill_name": "parallel-audit",
+  "evals": [
+    {
+      "id": 1,
+      "name": "claude-md-post-refactor-default-flow",
+      "prompt": "I just added several new Tier 2/Tier 3 entries to ~/.claude/CLAUDE.md and want to verify the wording doesn't have hidden contradictions or undefined terms before I rely on it. Please run the parallel audit. Defaults are fine.",
+      "expected_output": "Phase 1 symptom interview via AskUserQuestion → user selects 'post-refactor verification'. Phase 1.5 keeps full-file scope. Phase 2 confirms target=~/.claude/CLAUDE.md, target_type=claude-md (auto-detected), N=3, threshold=2, max_iterations=3, exclusions pre-loaded from references/claude-md-specifics.md and presented as multi-select. Phase 2.5 skipped (claude-md target). Phase 3 section purposes confirmed via batch AskUserQuestion. Phase 4 dispatches 3 sonnet subagents in a single tool-call message with run_in_background=true. Phase 5 produces Table A and Table B with ≥2/3 threshold. Phase 6/6.5/7/8/9/10 standard pipeline. Phase 11 anticipates auto-mode classifier (CLAUDE.md is agent config) and uses the references/claude-md-specifics.md authorization template if blocked. Phase 11.5(a) re-dispatch. Phase 12 stop check.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor identifies that this task triggers parallel-audit (not claude-md-improver, not revise-claude-md, not a single-pass review)", "kind": "behavioral"},
+        {"text": "Phase 1 symptom interview runs first via AskUserQuestion (not skipped because the symptom seems obvious from the user's wording)", "kind": "behavioral"},
+        {"text": "Phase 2 auto-detects target_type=claude-md from the ~/.claude/CLAUDE.md path", "kind": "behavioral"},
+        {"text": "Phase 2 confirms N=3, threshold=2, max_iterations=3 via AskUserQuestion (the new defaults, not the old N=9/threshold=4 from cmpa)", "kind": "behavioral"},
+        {"text": "Phase 2 pre-loads the CLAUDE.md-specific exclusion defaults from references/claude-md-specifics.md (subagent_type names, documented overrides, dual-layer designs, Tier dual management, external Claude Code concepts)", "kind": "behavioral"},
+        {"text": "Phase 2.5 is skipped because target_type=claude-md (only runs for skill-md targets)", "kind": "behavioral"},
+        {"text": "Phase 3 drafts a 1-line purpose per top-level section by reading ~/.claude/CLAUDE.md, then confirms the full batch via a single AskUserQuestion", "kind": "behavioral"},
+        {"text": "Phase 4 dispatches exactly N=3 subagents in a single tool-call message with run_in_background: true, subagent_type general-purpose, model: \"sonnet\", using agents/auditor.md content as the prompt body (byte-identical across instances)", "kind": "behavioral"},
+        {"text": "Phase 4 dispatch does not add 'be honest' / 'no sycophancy' instructions on top of auditor.md", "kind": "behavioral"},
+        {"text": "Phase 5 Table B applies the ≥2/3 threshold (not ≥4/9)", "kind": "behavioral"},
+        {"text": "Phase 6.5 dispatches a false-positive-detector subagent when ≥1 fix candidate exists", "kind": "behavioral"},
+        {"text": "Phase 7 dispatches redundancy-checker with target_type=claude-md (so it compares against Claude Code defaults, not sibling skills)", "kind": "behavioral"},
+        {"text": "Phase 9 dispatches one fix-safety-checker per fix candidate (or per option in multi-option mode), in parallel within one tool-call message", "kind": "behavioral"},
+        {"text": "Phase 10 asks one AskUserQuestion per fix candidate (not batched)", "kind": "behavioral"},
+        {"text": "Because target is ~/.claude/CLAUDE.md, the executor anticipates the auto-mode classifier and is prepared to use the references/claude-md-specifics.md 'Yes, update my CLAUDE.md' authorization template if Edit is blocked", "kind": "behavioral"},
+        {"text": "Phase 11.5(a) re-dispatch reuses Phase 3 section_purposes (does not re-collect) and updates exclusion list with anything user added during Phase 10", "kind": "behavioral"},
+        {"text": "Phase 12 stop conditions reference the new defaults (≥(3−2+1)=≥2 of 3 say clean as practical convergence, max_iterations=3)", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "skill-md-pre-shipping-with-eval-integration",
+      "prompt": "I'm about to ship a new plugin and want a final structural+prose audit on its SKILL.md before publishing. The file is /Users/tm/development/oss/almondoo-claude-plugins/plugins/parallel-audit/skills/parallel-audit/SKILL.md. Use defaults and run skill-eval's static check too if available.",
+      "expected_output": "Phase 1 symptom interview → user selects 'pre-shipping check'. The skill enforces target_type=skill-md (rejecting pre-shipping for claude-md targets). Phase 1.5 full-file scope, ensure_phase_2_5=true and ensure_phase_11_5c=true are set. Phase 2 auto-detects target_type=skill-md from the SKILL.md filename, pre-loads SKILL.md-specific exclusion defaults (subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter-delegated-to-skill-eval). Phase 2.5 runs skill-eval's static_check.py and writes static.json (because ensure_phase_2_5 is set). Phase 3 section purposes baseline. Phase 4 dispatches 3 sonnet subagents. Phase 5/6/6.5/7/8/9/10/11 standard. Phase 11 does NOT trigger the auto-mode classifier (plugin source, not installed config) so no authorization template needed. Phase 11.5(a) re-dispatch, Phase 11.5(c) re-runs static_check.py (because ensure_phase_11_5c is set). Phase 12 stop check includes the skill-eval ship-ready criterion (score==1.0 AND warnings==0).",
+      "files": [],
+      "assertions": [
+        {"text": "Phase 1 symptom interview triggers, user selects pre-shipping; the skill validates that target_type will be skill-md (would redirect to 'post-refactor' if it were claude-md)", "kind": "behavioral"},
+        {"text": "Phase 2 auto-detects target_type=skill-md from the SKILL.md filename in the path", "kind": "behavioral"},
+        {"text": "Phase 2 pre-loads the SKILL.md-specific exclusion defaults from references/skill-md-specifics.md (4 items: subagent_type names, placeholder conventions, cross-skill informational pointers, frontmatter delegated to skill-eval)", "kind": "behavioral"},
+        {"text": "Phase 2.5 runs skill-eval's static_check.py on the target skill directory and writes the result to workspace/iteration-0/static.json (because ensure_phase_2_5 is set by the pre-shipping symptom)", "kind": "behavioral"},
+        {"text": "Phase 2 appends a 5th exclusion item pointing to the static.json so Phase 4 auditors know not to re-flag the structural axes covered by skill-eval", "kind": "behavioral"},
+        {"text": "Phase 7 dispatches redundancy-checker with target_type=skill-md (so it compares against skill-creator / skill-eval / sibling skills, not Claude Code defaults), and includes sibling_skills from glob plugins/*/skills/*/SKILL.md of the marketplace root", "kind": "behavioral"},
+        {"text": "Phase 11 does NOT use the auto-mode classifier authorization template, because the file is in plugins/ source layout (plugin artifact, not installed config) per references/skill-md-specifics.md location table", "kind": "behavioral"},
+        {"text": "Phase 11.5(c) re-runs skill-eval static_check.py after fixes are applied, writing to workspace/iteration-N/static.json (because ensure_phase_11_5c is set)", "kind": "behavioral"},
+        {"text": "Phase 12 stop check includes the SKILL.md-specific ship-ready criterion (Phase 11.5(c) static.json reports score == 1.0 AND warnings == 0) in addition to the generic convergence criteria", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "routine-warning-abort",
+      "prompt": "Run a multi-agent audit on ~/.claude/CLAUDE.md. No specific issue, just routine maintenance.",
+      "expected_output": "Phase 1 symptom interview presents 6 options; user selects 'routine'. Phase 1 emits the routine warning (cost mismatch, asymptote, lighter alternatives) and asks for explicit confirmation. The expected behavior is the executor honors the warning protocol — if the user picks 'No, I'll use a lighter tool instead', the skill aborts gracefully and suggests claude-md-improver or a single-pass Claude review. The skill does NOT silently proceed to Phase 2 just because the user invoked the skill.",
+      "files": [],
+      "assertions": [
+        {"text": "Phase 1 symptom interview presents the 6 options including 'routine' as an explicit option", "kind": "behavioral"},
+        {"text": "When the user selects 'routine', Phase 1 emits the warning (asymptote / cost / lighter alternatives) per agents/symptom-interview.md, not silent pass-through", "kind": "behavioral"},
+        {"text": "The warning lists at least one concrete lighter alternative (single-pass Claude review or claude-md-improver) with their relative cost", "kind": "behavioral"},
+        {"text": "Phase 1 asks for explicit confirmation via AskUserQuestion after the warning (does not assume the user wants to proceed)", "kind": "behavioral"},
+        {"text": "If the user picks 'No, I'll use a lighter tool', the skill aborts gracefully — does not run Phase 2 onward", "kind": "behavioral"},
+        {"text": "If the user picks 'Yes, proceed (one-time exploratory run)', routine_override=true is set and surfaced in the final report so the user sees their override decision", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "specific-rule-scope-narrowing",
+      "prompt": "My ~/.claude/CLAUDE.md has a rule about 'always use built-in tools instead of Bash for file I/O' but I noticed Claude keeps using grep via Bash anyway. I want to audit just that rule and the nearby sections to find what's making it ambiguous. N=3 is fine.",
+      "expected_output": "Phase 1 symptom interview → user selects 'specific rule ignored/misapplied'. Phase 1 follow-up AskUserQuestion asks which rule. User identifies the 'use built-in tools' rule. Phase 1.5 sets scope_hint=rule-and-neighbors, scope_target=<rule text or section heading>. Phase 4 auditors receive scope_directive telling them to read only the named rule ± 20 lines AND grep the file for terms appearing in the rule, reading any other section that references those terms. Per-instance token usage is 1/3-1/5 of full-file. Rest of workflow proceeds with the narrowed scope.",
+      "files": [],
+      "assertions": [
+        {"text": "Phase 1 symptom interview → user selects 'specific-rule'", "kind": "behavioral"},
+        {"text": "Phase 1 follow-up AskUserQuestion asks which rule (does not infer from the user's wording alone)", "kind": "behavioral"},
+        {"text": "Phase 1.5 sets scope_hint=rule-and-neighbors with scope_target populated from the user's answer", "kind": "behavioral"},
+        {"text": "Phase 1.5 confirms the chosen scope with AskUserQuestion before proceeding (one option per scope type plus 'let me specify lines')", "kind": "behavioral"},
+        {"text": "Phase 4 dispatches subagents with a scope_directive substituted into agents/auditor.md telling them to read only the named rule ± 20 lines AND grep for cross-references — not the whole file", "kind": "behavioral"},
+        {"text": "Per-instance token usage for Phase 4 is materially lower than full-file (target: 1/3 to 1/5 of full-file cost)", "kind": "format"},
+        {"text": "Phase 3 section_purposes still covers the full file (the intent baseline is full-file regardless of audit scope)", "kind": "behavioral"}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "should-not-trigger-on-skill-authoring",
+      "prompt": "I want to create a brand new SKILL.md from scratch for a workflow that captures the steps when users ask about migrating Postgres data. Walk me through writing the SKILL.md, drafting test prompts, and benchmarking whether it actually helps a subagent.",
+      "expected_output": "The executor does NOT trigger parallel-audit. It recognizes that the request asks for (a) authoring a new SKILL.md from scratch and (b) with-skill vs without-skill A/B benchmarking — both owned by skill-creator. The executor either invokes skill-creator directly or tells the user that skill-creator is the right tool, citing the authoring-vs-audit distinction.",
+      "files": [],
+      "assertions": [
+        {"text": "The executor does NOT invoke parallel-audit's Phase 1 setup for this prompt", "kind": "behavioral"},
+        {"text": "The executor recognizes that 'create a SKILL.md from scratch' + 'benchmark whether it helps' map to skill-creator's authoring + A/B benchmarking workflow, not to multi-agent prose audit of an existing file", "kind": "behavioral"},
+        {"text": "The executor either invokes skill-creator directly or tells the user that skill-creator is the right tool, citing the authoring-vs-audit distinction (parallel-audit's 'Do NOT use' list explicitly excludes this case)", "kind": "behavioral"}
+      ]
+    }
+  ]
+}

@@ -7,8 +7,7 @@
 *.swp
 *.swo
 
-# Local scratch (covers skill-eval workspaces at tmp/skill-eval/<skill>/iteration-N/
-# — never placed inside plugins/ so installed plugins do not carry eval artefacts)
+# Local scratch
 tmp/
 .worktrees/
 

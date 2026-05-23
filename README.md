@@ -8,9 +8,8 @@
 
 | プラグイン | 概要 |
 |---|---|
-| [`claude-md-parallel-audit`](plugins/claude-md-parallel-audit) | CLAUDE.md 等の agent 指示ファイルを multi-agent で並列 audit。N 個の subagent を独立に走らせ、再現性 (≥4/9 デフォルト) で issue を絞り込んで fix を提案 |
 | [`configure-github-permissions`](plugins/configure-github-permissions) | `.claude/settings.local.json` 上で `gh` コマンドの permission を 10 カテゴリ × 3 択 (allow / ask / deny) でインタラクティブに設定。破壊的カテゴリ (merge / release / workflow exec / gh api) は deny がデフォルト |
-| [`skill-eval`](plugins/skill-eval) | 任意の Claude Code skill を 2 層 (static 構造採点 + dynamic A/B ベンチ) で評価。with-skill / without-skill を並列実行し、pass rate / 時間 / トークン delta を比較 |
+| [`parallel-audit`](plugins/parallel-audit) | 指示ファイル (CLAUDE.md / CLAUDE.local.md / AGENTS.md / GEMINI.md / SKILL.md) を multi-agent で並列 audit。N 個の subagent を独立に走らせ、再現性 (≥2/3 デフォルト) で issue を絞り込んで fix を提案。`target_type` 分岐で CLAUDE.md / SKILL.md を統一処理、event-driven 診断として設計 (Phase 1 で routine 利用を警告) |
 
 ## マーケットプレイスの追加
 
