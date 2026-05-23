@@ -4,6 +4,66 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-24 (1.2.2 → 1.2.3 — 多角評価 + FP-recheck + rolling static review 収束)
+
+### 経緯
+
+ユーザー自ら parallel-audit を多角評価依頼 → 評価に対し parallel-audit pattern で self-FP-check → iter-2/iter-3 で rolling static review を回し収束まで到達。本セッションは plugin 自身の workflow を plugin 自身の評価プロセスに適用した meta-loop。
+
+### iter-1 (1.2.2 への 4 件 fix)
+
+`tmp/fp-recheck/verifier-{1,2,3}.md` の ≥2/3 aggregate で確定した REAL のうち、即時 fix 可能な 4 件を 1.2.1 → 1.2.2 に reflect:
+
+| Fix | 対象 | 内容 |
+|---|---|---|
+| R1 | SKILL.md + README + README-en | "Known limitations" 節新設 (in-session recall 未測定 / e2e benchmark 不在 / Phase 9 fan-out worst case / external sample = 1) |
+| R6 | SKILL.md L406 段落 | worst-case 300-750k math (10-15 safety-checkers × 30-50k) 追記 |
+| R10 | references/shared-blind-spots.md 新設 | `(N − threshold + 1)` FP-hint を両 target-specifics から factor out、新ファイル canonical 化 |
+| R11 | references/skill-md-specifics.md L24 | stale `<this-skill-path>` を prose-used placeholder (`<marketplace_root>` / `<workspace>` / `<name>`) に置換 |
+
+撤回: C7 (placeholder SSoT) は 3 verifier 中 2 で FALSE → producer-consumer contract surface であり SSoT 違反ではない。
+
+### iter-2 (1.2.2 への追加 3 件 fix)
+
+iter-2 reviewer 3 並列 ≥2/3 で確定した REAL:
+
+| Fix | 対象 | 内容 |
+|---|---|---|
+| A (3/3) | false-positive-detector.md + SKILL.md (4 箇所) | shared-blind-spots wiring が prose only で **runtime contract に通っていなかった**: FP-detector Input section に 5th input `known_fp_patterns` 追加、Task step 0 を known-FP shortcut 化、SKILL.md Verification subagents table Phase 6.5 行に `known_fp_patterns` 追加、Phase 2 substep 4 に union assembly 指示、Tool requirements Read 行に shared-blind-spots.md 追加 |
+| B (2/3) | SKILL.md L410 段落 | "300-750k" の帰属を **Phase 9 alone** に統一 (L420 と整合)。直前 wording が "verification overhead" (Phase 6.5+7+9 combined) と矛盾していた |
+| C (2/3) | README.md + README-en.md Layout tree | 新規 `shared-blind-spots.md` + 既存 `pitfalls.md` が両 README の layout block から欠落していた |
+
+### iter-3 (収束判定)
+
+iter-2 fix 後の状態に対し 3 reviewer を再 dispatch:
+
+| Reviewer | Resolution A/B/C | New HIGH findings |
+|---|---|---|
+| r1 | 3/3 RESOLVED | **NO HIGH ISSUES** |
+| r2 | 3/3 RESOLVED | 1 HIGH (F1: L420 で "4-9× upper" と "2× headline" の budget heuristic が異なる base に対して混在) |
+| r3 | 3/3 RESOLVED | **NO HIGH ISSUES** |
+
+**Aggregate**: 2/3 が NO HIGH ISSUES → Phase 12 primary stop condition #2 (practical convergence: ≥(N-threshold+1)=≥2 of 3 報告 clean) **成立**。
+
+### r2-F1 (below-threshold) の保留
+
+r2 のみが flag した L420 paragraph 内部の budget heuristic 不整合 (`9 × 80k = 720k` vs `2 × 150k = 300k` で base が違う) は 1/3 = threshold 未達。skill 自身の discipline では "reproducible defect ではない" として fix 適用せず。
+
+ただし内容は real な可能性が高い (shared blind spot ではなく r1/r3 の見落としかもしれない subtle defect)。next event-driven audit で同じ flag が再 surface したら fix 候補に昇格させる。本 session では skill rule に忠実に **保留**。
+
+### Self-test meta-loop の教訓
+
+- **parallel-audit pattern を自己評価に適用すると workable**: 3 reviewer 並列 → ≥2/3 aggregate → fix → 再 dispatch の cycle は plugin 評価にも適用できた。iter-1 (14 criticisms verify) + iter-2 (8 HIGH findings) + iter-3 (収束判定) で計 4 ラウンドの aggregate を実施
+- **shared-blind-spots factor-out は wiring まで通さないと leaky**: iter-1 で新設したが、iter-2 全 reviewer が "agent prompt に入力 slot がない" を flag。**ファイル新設 + 1 ヶ所言及だけでは不十分、consumer 側 contract まで update が必要** という教訓
+- **threshold rule の trade-off**: r2-F1 が real-but-below-threshold の典型例。≥2/3 は "shared blind spot を回避するため過剰検出を弾く" が目的なので、稀に real findings も filter out される。今回は rule に忠実に保留したが、event-driven 再 audit で再 surface すれば確定 fix 候補
+
+### 残課題 (本 session スコープ外)
+
+- **真の C1 解消** — in-session triggering recall の実 session 計測 (5-10 回 manual register が必要)
+- **R2 scripts/** — working_threshold 計算 / scope-token 比較を Python 化 (LOC 50-100、別エフォート)
+- **r2-F1** — 上記 below-threshold 保留分。次回 audit で再 surface するか観察
+- **C5 / C8 / C9 / C13 (iter-1 NEEDS_HUMAN)** — empirical 比較 / version policy 判断
+
 ## 2026-05-23 (v0.2.0 bump + 4 件の指摘事項対応)
 
 ### v0.1.0 → v0.2.0 bump

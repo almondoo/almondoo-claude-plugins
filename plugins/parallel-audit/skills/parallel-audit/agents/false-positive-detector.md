@@ -30,11 +30,13 @@ You will be given:
    category: (4) section-to-section contradiction
    ```
 4. **`exclusion_list`** — the user-provided list of intentional design choices that must not be flagged
+5. **`known_fp_patterns`** — pre-loaded known-false-positive patterns. The orchestrator builds this as the union of (the target-type-specific specifics document's "Common shared-blind-spot patterns" section) + (the target-type-agnostic `references/shared-blind-spots.md` entries). Each entry takes the form `<auditor flag description> → <FALSE | NEEDS_HUMAN | KNOWN_ASYMPTOTE> (<one-line reason or pointer>)`. Use this set as the **first check** before doing your independent re-read — if a convergent issue clearly matches one of these entries, you can return the documented verdict with the matched entry as evidence, without re-reading the file in full. If no entry matches, proceed to the independent re-read in step 1 of Task.
 
 ## Task
 
 For each convergent issue:
 
+0. **First, scan `known_fp_patterns`.** If the issue clearly matches a pre-loaded pattern (same auditor framing, same line context, same root cause), return the documented verdict for that pattern (typically FALSE; sometimes NEEDS_HUMAN or KNOWN_ASYMPTOTE) and cite the matched entry as evidence. Skip the rest of the steps for this issue. This is the orchestrator's shortcut to suppress recurring shared blind spots without re-reading the file every iteration. If no entry clearly matches, proceed to step 1.
 1. Read **only the relevant lines** of `target_file` (cited line ± 10 lines of context). Use the Read tool with `offset` and `limit`.
 2. If the issue references other sections of the same file or other files in `related_files`, read those too. Don't load the whole file unless necessary.
 3. Independently evaluate whether the issue holds up:

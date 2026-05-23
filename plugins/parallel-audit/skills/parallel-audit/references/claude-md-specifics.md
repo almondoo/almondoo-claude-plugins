@@ -24,7 +24,8 @@ Phase 6.5 `false-positive-detector` should be aware of these patterns for CLAUDE
 - **Auditors flag a documented override as a CLAUDE.md violation** → FALSE (covered by exclusion default 2)
 - **Auditors flag dual-layer enforcement as redundancy / contradiction** → FALSE (covered by exclusion defaults 3 and 4)
 - **Auditors flag a rule citing `permissions.deny` as "undefined term"** → FALSE (covered by exclusion default 5)
-- **Auditors flag the practical-convergence row `(N − threshold + 1)` as "missing rationale"** → FALSE — the derivation is inlined at SKILL.md Phase 12 "Derivation" note. If the auditor read the file in full they had the rationale and missed it.
+
+For target-type-agnostic patterns that apply equally to claude-md and skill-md targets (e.g., the `(N − threshold + 1)` "missing rationale" pattern), see `references/shared-blind-spots.md`. Phase 6.5 should treat that file's entries plus the entries above as one combined known-FP set.
 
 ## Phase 11 auto-mode classifier playbook
 

@@ -21,11 +21,12 @@ The user can add skill-specific intentional design at Phase 2 — e.g., "this se
 Phase 6.5 `false-positive-detector` should be aware of these patterns for SKILL.md targets:
 
 - **Auditors flag `subagent_type: general-purpose` as undefined** → FALSE (covered by exclusion default 1)
-- **Auditors flag `<this-skill-path>` / `<workspace>` as undefined** → FALSE (covered by exclusion default 2)
+- **Auditors flag path-template placeholders such as `<marketplace_root>` / `<workspace>` / `<name>` as undefined** → FALSE (covered by exclusion default 2 — these are runtime substitutions inside path globs, command shapes, or formulas, not undefined terms)
 - **Auditors flag a cross-skill schema reference as "unverifiable"** → REAL only if the load-bearing content is not also inlined; FALSE if it's an informational pointer (exclusion default 3)
 - **Auditors flag frontmatter description as "too long / too short"** → FALSE (exclusion default 4; skill-eval owns this)
 - **Auditors flag the cost-tier table as "missing the deep tier rationale"** → KNOWN ASYMPTOTE; the per-tier when-to-use column already documents the rationale, but auditors keep wanting a separate "why these tiers" paragraph
-- **Auditors flag the practical-convergence row `(N − threshold + 1)` as "missing rationale"** → FALSE — the derivation is inlined at SKILL.md Phase 12 "Derivation" note. If the auditor read the file in full they had the rationale and missed it.
+
+For target-type-agnostic patterns that apply equally to claude-md and skill-md targets (e.g., the `(N − threshold + 1)` "missing rationale" pattern), see `references/shared-blind-spots.md`. Phase 6.5 should treat that file's entries plus the entries above as one combined known-FP set.
 
 ## Phase 2.5: Pre-audit static check
 

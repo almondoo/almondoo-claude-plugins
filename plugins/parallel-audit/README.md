@@ -43,7 +43,14 @@
 /parallel-audit:parallel-audit
 ```
 
-ユーザーが指示ファイル (CLAUDE.md / SKILL.md など) について **監査 / レビュー / 検証 / 品質チェック** を依頼したとき、または *multi-agent audit* / *convergence audit* / *parallel review* / *instruction file consistency* / *audit my SKILL.md* といったキーワードに言及したとき、長い指示ファイルの欠陥に対して高い信頼性のある再現性を求めるときに、スキルが自動起動します。
+ユーザーが指示ファイル (CLAUDE.md / SKILL.md など) について **監査 / レビュー / 検証 / 品質チェック** を依頼したとき、または *multi-agent audit* / *convergence audit* / *parallel review* / *instruction file consistency* / *audit my SKILL.md* といったキーワードに言及したとき、長い指示ファイルの欠陥に対して高い信頼性のある再現性を求めるときに、スキルが自動起動 **することを意図しています** (下記の Known limitations を参照)。
+
+## Known limitations
+
+- **In-session triggering recall は未検証**: skill-creator の `claude -p` backend では recall=0% (4 件の should-trigger eval で 0/4 hit)。実 Claude Code session での triggering は別経路だが、in-session の recall は未計測。確実に発火させたいときは `/parallel-audit:parallel-audit` で明示起動してください。
+- **Should-trigger eval は trace review 止まり**: AskUserQuestion が subagent をブロックするため、肯定ケース (eval id 1-4) は end-to-end ベンチマーク未実施。否定ケース (eval id 5-7) のみ end-to-end 検証済み。
+- **Phase 9 fan-out cost**: 不具合の多いファイル (fix candidate 5+ × multi-option) では cost-tier table の "+20-80k" を 4-9× 超える可能性 (SKILL.md "Known limitations" 参照)。
+- **外部 target 運用サンプル数 = 1** (`~/.claude/CLAUDE.md`)。それ以外の CLAUDE.md / SKILL.md に対する挙動は未確認。
 
 ## レイアウト
 
@@ -62,7 +69,9 @@ parallel-audit/
 │       ├── references/
 │       │   ├── claude-md-specifics.md          # CLAUDE.md 固有 exclusion + auto-mode classifier playbook
 │       │   ├── skill-md-specifics.md           # SKILL.md 固有 exclusion + skill-eval 連携
+│       │   ├── shared-blind-spots.md           # target-type 非依存の共通 FP パターン (両 specifics から参照)
 │       │   ├── ab-testing.md                   # Phase 11.5(b) optional A/B 統合ガイド
+│       │   ├── pitfalls.md                     # workflow / aggregation / fix-proposal / target-specific の落とし穴集約
 │       │   └── symptom-interview-protocol.md   # Phase 1 の症状構造化プロトコル
 │       └── evals/
 │           └── evals.json                 # トリガー / 振る舞いテスト

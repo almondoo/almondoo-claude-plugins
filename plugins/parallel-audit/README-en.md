@@ -43,7 +43,14 @@ Iterates until convergence or `max_iterations` (default `3`):
 /parallel-audit:parallel-audit
 ```
 
-The skill activates automatically when the user requests **audit / review / verification / quality check** of an instruction file (CLAUDE.md / SKILL.md and similar), mentions keywords such as *multi-agent audit* / *convergence audit* / *parallel review* / *instruction file consistency* / *audit my SKILL.md*, or asks for highly reliable, reproducible detection of defects in long instruction files.
+The skill is **intended to activate automatically** when the user requests **audit / review / verification / quality check** of an instruction file (CLAUDE.md / SKILL.md and similar), mentions keywords such as *multi-agent audit* / *convergence audit* / *parallel review* / *instruction file consistency* / *audit my SKILL.md*, or asks for highly reliable, reproducible detection of defects in long instruction files. See "Known limitations" below for the current triggering caveat.
+
+## Known limitations
+
+- **In-session triggering recall is unmeasured.** The only triggering measurement runs through skill-creator's `claude -p` backend, where the skill recorded recall = 0% on 4 should-trigger evals. In-session triggering is a different code path, but has not been re-measured. Until that's done, **invoke the skill explicitly** (`/parallel-audit:parallel-audit` or naming the skill in your prompt) when you want it.
+- **Should-trigger evals are trace-reviewed, not end-to-end benchmarked.** Phase 1 / 2 / 3 / 10 / 11 `AskUserQuestion` calls block subagent runs, so eval ids 1–4 are verified by trace review (reading SKILL.md prose) rather than end-to-end execution. Only the should-not-trigger evals (5–7) have end-to-end benchmarks.
+- **Phase 9 fan-out cost can exceed the headline range.** For defect-rich files (5+ fix candidates × multi-option mode), Phase 9 alone can dispatch 10–15 safety-checkers and push verification overhead 4–9× above the cost-tier table's "+20–80k" estimate. See SKILL.md "Known limitations" for the worst-case math.
+- **External-target operating sample size = 1** (`~/.claude/CLAUDE.md`). Behaviors specific to less-common CLAUDE.md / SKILL.md shapes remain unobserved.
 
 ## Layout
 
@@ -62,7 +69,9 @@ parallel-audit/
 │       ├── references/
 │       │   ├── claude-md-specifics.md          # CLAUDE.md exclusion defaults + auto-mode classifier playbook
 │       │   ├── skill-md-specifics.md           # SKILL.md exclusion defaults + skill-eval integration
+│       │   ├── shared-blind-spots.md           # target-type-agnostic shared FP patterns (referenced from both specifics)
 │       │   ├── ab-testing.md                   # Phase 11.5(b) optional A/B integration guide
+│       │   ├── pitfalls.md                     # workflow / aggregation / fix-proposal / target-specific pitfalls
 │       │   └── symptom-interview-protocol.md   # Phase 1 symptom structuring protocol
 │       └── evals/
 │           └── evals.json                 # trigger / behavior tests
