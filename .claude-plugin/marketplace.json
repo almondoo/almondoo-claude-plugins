@@ -39,9 +39,9 @@
     },
     {
       "name": "skill-eval",
-      "description": "Evaluate any Claude Code skill on two layers: (1) static structural quality scoring derived from claude-code plugin conventions (frontmatter validity, body length, progressive disclosure, description triggerability) and (2) dynamic A/B benchmarking that runs the same prompts in parallel subagents with-skill vs without-skill and compares pass rate, time, and tokens.",
+      "description": "Evaluate any Claude Code skill on two layers: (1) static structural quality scoring derived from claude-code plugin conventions (frontmatter validity, body length, progressive disclosure, description triggerability) and (2) dynamic A/B benchmarking that runs the same prompts in parallel subagents with-skill vs without-skill and compares pass rate, time, and tokens. Ships with a sibling skill-eval-viewer skill that renders the workspace into a designed HTML report (Field Audit theme) and can serve it on http://127.0.0.1:PORT/.",
       "source": "./plugins/skill-eval",
-      "version": "0.1.4",
+      "version": "0.3.1",
       "category": "productivity",
       "keywords": [
         "skill",
@@ -49,7 +49,10 @@
         "benchmark",
         "ab-test",
         "skill-quality",
-        "with-without-skill"
+        "with-without-skill",
+        "viewer",
+        "html-report",
+        "localhost-serve"
       ]
     },
     {

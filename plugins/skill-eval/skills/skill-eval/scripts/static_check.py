@@ -225,12 +225,18 @@ def check_structure(skill_dir: Path, body: str) -> list[Check]:
     refs = skill_dir / "references"
     scripts = skill_dir / "scripts"
     assets = skill_dir / "assets"
-    has_pd = any(p.is_dir() for p in (refs, scripts, assets))
+    agents = skill_dir / "agents"
+    prompts = skill_dir / "prompts"
+    pd_dirs = (refs, scripts, assets, agents, prompts)
+    has_pd = any(p.is_dir() for p in pd_dirs)
     out.append(Check(
         axis="structure.has_progressive_disclosure",
         passed=has_pd,
         severity="info",
-        evidence=f"references={refs.is_dir()} scripts={scripts.is_dir()} assets={assets.is_dir()}",
+        evidence=(
+            f"references={refs.is_dir()} scripts={scripts.is_dir()} "
+            f"assets={assets.is_dir()} agents={agents.is_dir()} prompts={prompts.is_dir()}"
+        ),
     ))
     for sub, axis in ((scripts, "structure.scripts_referenced_from_body"), (refs, "structure.references_referenced_from_body")):
         if not sub.is_dir():

@@ -67,7 +67,7 @@ More than 10 per 100 lines is too many. This is a rule of thumb.
 
 | axis | intent |
 |---|---|
-| `structure.has_progressive_disclosure` | Long skills should be split into `references/` / `scripts/` / `assets/`. Short skills (~100 lines) do not need this |
+| `structure.has_progressive_disclosure` | Long skills should be split into bundled-resource subdirectories. Any of `references/` / `scripts/` / `assets/` / `agents/` / `prompts/` counts (`agents/` and `prompts/` were added in v0.3.0 — historically skill-eval missed `agents/`-only skills, capping their score at 0.968). Short skills (~100 lines) do not need this |
 | `structure.scripts_referenced_from_body` | A script under `scripts/` that is never named in the body is dead code. The check looks for the filename (e.g. `scripts/foo.py`) being mentioned in `SKILL.md` |
 | `structure.references_referenced_from_body` | Same idea for `references/` |
 
@@ -120,10 +120,12 @@ The rationale behind the decision logic mentioned in `SKILL.md`. The verdicts ar
 
 | order | verdict | condition | intuition |
 |---|---|---|---|
-| 1 | **Net negative** | `pass_rate delta ≤ 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`) | better off without the skill |
+| 1 | **Net negative** | `pass_rate delta < 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`) | with-skill actually scored worse — actionable harm |
 | 2 | **Ship-ready** | `static score ≥ 0.8` AND `pass_rate delta ≥ +0.2` | structurally sound and empirically helpful |
-| 3 | **Needs work** | any case not caught above | one more round of polish before shipping |
+| 3 | **Needs work** | any case not caught above (covers `delta = 0`, `delta ∈ (0, +0.2)`, `static score 0.4–0.8`, etc.) | one more round of polish before shipping |
 | flag | **Inconclusive** (additive) | `runs_per_configuration ≥ 3` AND `stddev > mean × 0.3` | high variance — verdict from rule 1–3 still applies, but treat with caution |
+
+`delta = 0` ("the skill changed nothing") used to fall under Net negative; v0.3.0 moved it into Needs work because a zero-delta skill wastes time/tokens but does not actively make outputs worse, so it deserves a different response (compress vs. remove).
 
 For `runs_per_configuration < 3`, the variance test is not applicable; report appends "single-run, variance not measured" instead of the Inconclusive flag, and the verdict from rules 1–3 stands.
 

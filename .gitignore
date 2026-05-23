@@ -7,12 +7,14 @@
 *.swp
 *.swo
 
-# Local scratch
+# Local scratch (covers skill-eval workspaces at tmp/skill-eval/<skill>/iteration-N/
+# — never placed inside plugins/ so installed plugins do not carry eval artefacts)
 tmp/
 .worktrees/
 
-# Personal Claude Code instructions (not shared)
+# Personal Claude Code instructions / settings (not shared)
 CLAUDE.local.md
+.claude/settings.local.json
 
 # Node
 node_modules/

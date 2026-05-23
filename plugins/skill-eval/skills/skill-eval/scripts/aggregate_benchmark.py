@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import statistics
 from pathlib import Path
 from typing import Optional
@@ -48,9 +47,12 @@ def stats(xs: list[Optional[float]]) -> dict:
     missing = len(xs) - len(present)
     if not present:
         return {"mean": None, "stddev": None, "min": None, "max": None, "n": 0, "missing": missing}
+    # n=1: stddev is undefined, not 0. Returning None lets downstream
+    # renderers show "n/a" instead of conflating "single sample" with
+    # "multiple samples all equal".
     return {
         "mean": round(statistics.fmean(present), 3),
-        "stddev": round(statistics.pstdev(present), 3) if len(present) > 1 else 0,
+        "stddev": round(statistics.pstdev(present), 3) if len(present) > 1 else None,
         "min": round(min(present), 3),
         "max": round(max(present), 3),
         "n": len(present),
@@ -90,50 +92,68 @@ def collect(iteration_dir: Path) -> tuple[list[dict], dict[int, str]]:
             cfg_dir = eval_dir / config
             if not cfg_dir.is_dir():
                 continue
-            grading = safe_load(cfg_dir / "grading.json") or {}
-            timing_raw = safe_load(cfg_dir / "timing.json")
-            timing = timing_raw or {}
-            expectations = grading.get("expectations", [])
-            passed = sum(1 for x in expectations if x.get("passed"))
-            total = len(expectations)
-            pass_rate = (passed / total) if total else None
-
-            # Distinguish "no timing.json" from "0 ms": both fields are
-            # treated as missing when timing.json is absent OR when the
-            # specific field is missing inside it.
-            duration_s: Optional[float] = None
-            if timing_raw is not None:
-                if "total_duration_seconds" in timing:
-                    duration_s = float(timing["total_duration_seconds"])
-                elif "duration_ms" in timing:
-                    duration_s = float(timing["duration_ms"]) / 1000.0
-            tokens: Optional[int] = (
-                int(timing["total_tokens"]) if (timing_raw is not None and "total_tokens" in timing) else None
+            # Two supported layouts: (a) cfg_dir directly contains grading.json/timing.json (single-run, legacy),
+            # or (b) cfg_dir contains run-<N>/ subdirs each holding the artefacts (multi-run).
+            run_subdirs = sorted(
+                [p for p in cfg_dir.iterdir() if p.is_dir() and p.name.startswith("run-")],
+                key=lambda p: int(p.name.split("-", 1)[1]) if p.name.split("-", 1)[1].isdigit() else 0,
             )
+            run_targets: list[tuple[int, Path]] = []
+            if run_subdirs:
+                for sd in run_subdirs:
+                    try:
+                        rn = int(sd.name.split("-", 1)[1])
+                    except ValueError:
+                        continue
+                    run_targets.append((rn, sd))
+            else:
+                run_targets.append((1, cfg_dir))
 
-            runs.append({
-                "eval_id": eval_id,
-                "eval_name": eval_names.get(eval_id, f"eval-{eval_id}"),
-                "configuration": config,
-                "run_number": 1,
-                "result": {
-                    "pass_rate": round(pass_rate, 3) if pass_rate is not None else None,
-                    "passed": passed,
-                    "failed": total - passed,
-                    "total": total,
-                    "time_seconds": round(duration_s, 1) if duration_s is not None else None,
-                    "tokens": tokens,
-                    "tool_calls": 0,
-                    "errors": 0,
-                },
-                "expectations": expectations,
-                "_missing_fields": [
-                    f for f in (
-                        "grading.json" if not grading else None,
-                        "timing.json" if timing_raw is None else None,
-                    ) if f
-                ],
-            })
+            for run_number, target in run_targets:
+                grading = safe_load(target / "grading.json") or {}
+                timing_raw = safe_load(target / "timing.json")
+                timing = timing_raw or {}
+                expectations = grading.get("expectations", [])
+                passed = sum(1 for x in expectations if x.get("passed"))
+                total = len(expectations)
+                pass_rate = (passed / total) if total else None
+
+                # Distinguish "no timing.json" from "0 ms": both fields are
+                # treated as missing when timing.json is absent OR when the
+                # specific field is missing inside it.
+                duration_s: Optional[float] = None
+                if timing_raw is not None:
+                    if "total_duration_seconds" in timing:
+                        duration_s = float(timing["total_duration_seconds"])
+                    elif "duration_ms" in timing:
+                        duration_s = float(timing["duration_ms"]) / 1000.0
+                tokens: Optional[int] = (
+                    int(timing["total_tokens"]) if (timing_raw is not None and "total_tokens" in timing) else None
+                )
+
+                runs.append({
+                    "eval_id": eval_id,
+                    "eval_name": eval_names.get(eval_id, f"eval-{eval_id}"),
+                    "configuration": config,
+                    "run_number": run_number,
+                    "result": {
+                        "pass_rate": round(pass_rate, 3) if pass_rate is not None else None,
+                        "passed": passed,
+                        "failed": total - passed,
+                        "total": total,
+                        "time_seconds": round(duration_s, 1) if duration_s is not None else None,
+                        "tokens": tokens,
+                        "tool_calls": 0,
+                        "errors": 0,
+                    },
+                    "expectations": expectations,
+                    "_missing_fields": [
+                        f for f in (
+                            "grading.json" if not grading else None,
+                            "timing.json" if timing_raw is None else None,
+                        ) if f
+                    ],
+                })
     return runs, eval_names
 
 
@@ -246,12 +266,19 @@ def main() -> int:
     summary = summarize(runs)
     diff = differentiating_assertions(runs)
 
+    # Compute runs_per_configuration as the max per-(eval,config) run count seen.
+    counts: dict[tuple[int, str], int] = {}
+    for r in runs:
+        k = (int(r["eval_id"]), r["configuration"])
+        counts[k] = counts.get(k, 0) + 1
+    rpc = max(counts.values()) if counts else 1
+
     payload = {
         "metadata": {
             "skill_name": args.skill_name,
             "iteration_dir": str(iteration_dir),
             "evals_run": sorted({r["eval_id"] for r in runs}),
-            "runs_per_configuration": 1,
+            "runs_per_configuration": rpc,
         },
         "runs": runs,
         "run_summary": summary,

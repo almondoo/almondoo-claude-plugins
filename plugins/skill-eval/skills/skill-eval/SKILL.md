@@ -1,6 +1,6 @@
 ---
 name: skill-eval
-description: Evaluate any Claude Code skill on two layers — (1) static structural quality derived from claude-code plugin conventions (frontmatter validity, body length, progressive disclosure, description triggerability) and (2) dynamic A/B benchmarking that runs the same prompts in parallel subagents with-skill vs without-skill and compares pass rate, time, and tokens. Use whenever the user wants to evaluate, audit, benchmark, A/B test, score, or measure the quality of a skill, or when they ask "is this skill any good", "does this skill actually help", or "compare with and without this skill".
+description: Evaluate a Claude Code skill on two layers — structural quality (frontmatter validity, body length, progressive disclosure, description triggerability) and practical effectiveness (run the same prompts with-skill vs without-skill in parallel subagents and compare pass rate, time, and tokens). Use whenever the user wants to know "does this skill actually help", needs to audit a skill for claude-code plugin convention compliance before shipping, wants to benchmark with-skill against without-skill on real prompts, or needs to measure whether one skill version is better than another.
 ---
 
 # skill-eval
@@ -21,32 +21,68 @@ The axis details live in `references/eval-axes.md`. The thesis that "a skill sho
 
 ---
 
+## Step 0: Plan the iteration as a task list
+
+Before touching any tool, call `TaskCreate` and break the iteration into one task per step (Step 1 static → Step 2 evals → … → Step 6 unified report + HTML). Mark a task `in_progress` when you start it and `completed` when you finish — never batch the status updates. The task list is the visible progress signal for the user; the steps below are long, the harness shows only your messages and tool calls, and silent gaps are easy to misread as a stall.
+
+Suggested initial set (adjust to inputs once collected):
+
+- Step 1 — static_check.py
+- Step 2 — confirm evals.json
+- Step 3 — dispatch A/B subagents
+- Step 4 — grade
+- Step 5 — aggregate benchmark.json
+- Step 6 — write report.md + render report.html
+
+---
+
 ## Inputs
 
 Collect the following from the user (skip whatever has already been provided):
 
 1. **target_skill_path** (required) — directory of the skill to evaluate, e.g. `/path/to/plugins/foo/skills/foo/`. `SKILL.md` must live directly under it.
-2. **eval prompts** (optional) — test prompts. If absent, auto-generate 3 from the static result and the SKILL.md description, then confirm.
+2. **eval prompts** (optional) — test prompts. If absent, auto-generate 3 from the static result and the SKILL.md description, then confirm. Each eval must carry a one-sentence `description` field explaining what it tests — without it, the HTML report cannot tell the reader why this prompt matters.
 3. **runs_per_configuration** (optional) — number of repetitions per A/B configuration. Default 1. Suggest 3 only when you need to measure variance.
 4. **skip dynamic?** (optional) — if the user wants static only, skip the dynamic layer.
 
 Ask via AskUserQuestion (do not ask through plain text output).
+
+### Report language
+
+`AskUserQuestion` the user for the report language as one of the Step 0 / Inputs questions. The two supported values are `ja` (Japanese) and `en` (English) — the only entries in the viewer's `LOCALES` table. Default the question to whichever language the user's original prompt was written in, but always surface it explicitly rather than silently inferring it.
+
+Once chosen, write `report.md` in that language. The HTML renderer auto-detects the same language from the markdown content (CJK ≥ 25% → `ja`, else `en`) and matches the chrome accordingly; there is no separate language flag on the renderer because the markdown already encodes the choice.
+
+The eval workspace lives at `tmp/skill-eval/<skill-name>/` under the current working directory — outside the in-repo "write in English" perimeter and outside any installed plugin tree, treated like `tmp/` under the project's language policy. Non-English text is permitted there. Only the headline labels, table column names, and code identifiers stay in their canonical form.
+
+### Placeholders used throughout this skill
+
+The commands and snippets below repeatedly use angle-bracket placeholders. Resolve each at invocation time:
+
+- `<target_skill_path>` — input #1, the directory of the skill being evaluated.
+- `<workspace>` — `tmp/skill-eval/<skill-name>/` under the current working directory (`<skill-name>` = directory basename of `<target_skill_path>`). The workspace **must live outside the `plugins/` tree** so it is not distributed when this plugin is installed by another project; `tmp/` is gitignored both here and by convention in user projects.
+- `N` — current iteration number, starting at 1 and incrementing per re-run.
+- `<this-skill-path>` — the directory containing this `SKILL.md` (the skill-eval skill itself); use the absolute path Claude Code passes at skill-load time.
+- `<viewer-skill-path>` — the directory containing the sibling `skill-eval-viewer` skill; resolves to `../skill-eval-viewer/` relative to `<this-skill-path>` in this plugin.
 
 ---
 
 ## Workflow overview
 
 ```
+[Step 0] task list — TaskCreate one task per step below
 [Step 1] static_check.py scores structure          → static.json
-[Step 2] confirm eval prompts (provided or auto-generated)
+[Step 2] confirm eval prompts (provided or auto-generated; each carries a description)
 [Step 3] for each prompt, dispatch with_skill / without_skill subagents
          in parallel within the same turn
 [Step 4] grader (agents/grader.md) scores each run against assertions → grading.json
 [Step 5] aggregate_benchmark.py emits benchmark.json + benchmark.md
-[Step 6] write a unified report.md combining static + dynamic
+[Step 6] write report.md AND render report.html (viewer skill) — both artefacts in same step
 ```
 
-The workspace lives in the **parent directory of `target_skill_path`** as `<skill-name>-eval-workspace/`, where `<skill-name>` is the directory basename of `target_skill_path`. Each run creates a fresh `iteration-N/` subdirectory under the workspace; `N` starts at `1` on first run and increments by `1` for each subsequent run (determined by listing existing `iteration-*` subdirectories and taking the highest N + 1). All Step 1–6 commands in this skill use `<workspace>` to refer to `<skill-name>-eval-workspace/` (the parent of the iteration dirs). The layout mirrors skill-creator's so that the workspace can later be carried into skill-creator for further iteration.
+The workspace lives at **`tmp/skill-eval/<skill-name>/`** under the current working directory, where `<skill-name>` is the directory basename of `target_skill_path`. This is intentionally outside the `plugins/` tree: when this plugin is installed by another project, the plugin source must not carry per-target evaluation history. `tmp/` is gitignored at the marketplace root and by convention in user projects.
+
+Each run creates a fresh `iteration-N/` subdirectory under the workspace; `N` starts at `1` on first run and increments by `1` for each subsequent run (determined by listing existing `iteration-*` subdirectories and taking the highest N + 1). All Step 1–6 commands in this skill use `<workspace>` to refer to `tmp/skill-eval/<skill-name>/` (the parent of the iteration dirs). The layout mirrors skill-creator's so that the workspace can later be carried into skill-creator for further iteration.
 
 ---
 
@@ -99,11 +135,11 @@ If `hard_fail: true`, surface the structural blocker via AskUserQuestion before 
 
 ## Step 2: Confirm eval prompts
 
-If `<target>/evals/evals.json` already exists, adopt it. Otherwise:
+The source of truth for an evaluation run is **`<workspace>/iteration-N/evals.json`** — every later step reads from there. The target's own `<target_skill_path>/evals/evals.json` (when present) is only a *seed*: this skill never mutates it.
 
-1. Generate **3** test prompts from the description and body of SKILL.md.
-2. Confirm "are these 3 fine for evaluation?" via AskUserQuestion (edit / add / OK).
-3. Once confirmed, persist them as `<workspace>/iteration-N/evals.json`.
+1. **Source check**: if `<target_skill_path>/evals/evals.json` exists, load it as the starting set (skill authors often co-locate canonical evals with their skill). Otherwise generate 3 prompts from the SKILL.md description and body.
+2. **Confirm**: present the prompts (adopted or generated) via AskUserQuestion (edit / add / OK).
+3. **Persist**: write the confirmed set to `<workspace>/iteration-N/evals.json`. Subsequent steps read this file. The seed file under `<target_skill_path>/evals/` is left untouched, so each iteration can re-seed from it intentionally rather than picking up partial edits.
 
 Prompt-writing guidance (same thesis as skill-creator's "Description Optimization" section — concrete, multi-step, realistic queries beat abstract ones):
 
@@ -133,90 +169,25 @@ Attach 2–4 assertions per prompt:
 
 ## Step 3: A/B parallel dispatch
 
-**Important: dispatch every prompt × both configurations in the same turn.** Running the baseline later misaligns conditions (time-of-day, model load) and ruins comparability.
+For each eval prompt, launch **two `general-purpose` Agents in parallel within the same turn** (`run_in_background: true`) — one with the skill, one without — and persist `timing.json` (containing `total_tokens` / `duration_ms`) to each `<run-dir>/` **immediately** when the completion notification arrives. The values cannot be retrieved after the notification has passed.
 
-For each prompt, launch two Agents (`subagent_type: general-purpose`) with `run_in_background: true`:
+Soft cap = 6 subagents per iteration: when `2 × prompts × runs_per_configuration > 6`, reduce inputs at Step 2 rather than batching across turns — batching breaks cross-eval comparability (time-of-day, model load) which is the entire reason same-turn dispatch exists.
 
-### with-skill subagent
-
-```
-Execute this task. You have access to the following skill - read its SKILL.md first
-and follow it for the task:
-
-Skill SKILL.md path: <target_skill_path>/SKILL.md
-
-Task: <eval prompt>
-
-Save all outputs (files, final answer) under:
-<workspace>/iteration-N/runs/eval-<id>/with_skill/outputs/
-
-When done, write a short summary to outputs/SUMMARY.md describing what you produced.
-```
-
-### without-skill subagent
-
-```
-Execute this task WITHOUT using any special skill or external reference. Use only
-your default tools.
-
-Task: <eval prompt>
-
-Save all outputs under:
-<workspace>/iteration-N/runs/eval-<id>/without_skill/outputs/
-
-When done, write a short summary to outputs/SUMMARY.md describing what you produced.
-```
-
-The Agent tool's completion notification includes `total_tokens` and `duration_ms`. Persist those **immediately** to `<run-dir>/timing.json` — once the completion notification has passed, the values cannot be retrieved later. Write per child agent as soon as its notification arrives.
-
-```json
-{ "total_tokens": 84852, "duration_ms": 23332, "total_duration_seconds": 23.3 }
-```
-
-Runs with no `timing.json` are treated as `null` by the aggregator and excluded from stats (so they don't masquerade as a zero).
-
-### Dispatch decision criteria
-
-- Verify the target skill is **read-only / safe** by skimming its SKILL.md. Skills that perform external writes (PR creation, email send, etc.) need sandboxing rather than plain subagents — for now, warn the user and offer to skip the dynamic layer.
-- A high prompt-by-configuration count (e.g. 3 prompts × 2 configurations × 3 runs = 18 subagents) can blow up parallelism. To preserve the L136 "same turn" guarantee, treat **6 total subagents as the soft cap** for one evaluation: if `2 × prompts × runs_per_configuration > 6`, reduce one of the inputs (typically `runs_per_configuration` or the number of eval prompts) at Step 2 confirmation rather than batching across turns. Batching across turns would break L136's cross-eval time-of-day comparability guarantee.
+Full subagent prompt templates, safety check (warn for skills that perform external writes), and notification-handling rationale: see [`references/step-3-dispatch.md`](references/step-3-dispatch.md).
 
 ---
 
 ## Step 4: Grading
 
-Once every run has completed, hand each run's outputs and assertions to `agents/grader.md` (this is a **prompt template without frontmatter** — not a Claude Code agent file, so it cannot be dispatched as one). Spawn one grader subagent per run and instruct it to **read `agents/grader.md` from `<this-skill-path>/`** before grading; the example below shows the exact prompt shape.
+Spawn one grader subagent per run. Each grader reads `<this-skill-path>/agents/grader.md` (a frontmatter-less prompt template, not a dispatchable Claude Code agent file) and applies it to that run's outputs against the assertions from `evals.json`, writing `grading.json` to the run directory.
 
-Example grader input:
+`grading.json` field names — `expectations[] / text / passed / evidence / summary` — are read by key in the aggregator and viewer; **do not rename them**. The input/output schema asymmetry (`assertions: [{text, kind}]` in `evals.json` → `expectations: [{text, passed, evidence}]` in `grading.json`) is intentional.
 
-```
-Read this prompt template: <this-skill-path>/agents/grader.md (absolute path)
-Apply it to grade this run:
-  Run directory: <workspace>/iteration-N/runs/eval-<id>/with_skill/
-  Assertions: <full list from evals.json>
-Write grading.json to the run directory.
-```
-
-`grading.json` schema (compatible with the skill-creator viewer):
-
-```json
-{
-  "expectations": [
-    {"text": "...", "passed": true,  "evidence": "..."},
-    {"text": "...", "passed": false, "evidence": "..."}
-  ],
-  "summary": {"passed": 1, "failed": 1, "total": 2, "pass_rate": 0.5}
-}
-```
-
-The field names (`expectations` / `text` / `passed` / `evidence` / `summary`) are read by key in the aggregator and the viewer — do not rename them.
-
-For programmatically verifiable assertions (file existence, regex match, etc.), instruct the grader to "write a small script to verify". Eyeballing is slow and unreliable.
+Full grader input shape, programmatic vs. eyeball verification guidance, and asymmetry rationale: see [`references/step-4-grading.md`](references/step-4-grading.md).
 
 ---
 
 ## Step 5: Aggregation
-
-Run `scripts/aggregate_benchmark.py`:
 
 ```bash
 python3 <this-skill-path>/scripts/aggregate_benchmark.py \
@@ -225,38 +196,19 @@ python3 <this-skill-path>/scripts/aggregate_benchmark.py \
   --out <workspace>/iteration-N/benchmark.json
 ```
 
-The schema of `benchmark.json` mirrors skill-creator's reference (also documented in `skill-creator/references/schemas.md` for those who have it installed). The load-bearing top-level keys are:
+The script emits `benchmark.json` plus `benchmark.md`. Load-bearing top-level keys (read by the viewer in this order): `metadata` / `runs[]` / `run_summary` / `differentiating_assertions[]` / `notes[]`. The schema mirrors skill-creator's reference so the same viewer can render it.
 
-- `metadata` — `{ skill_name, iteration_dir, evals_run[], runs_per_configuration }`
-- `runs[]` — per-run records `{ eval_id, eval_name, configuration ("with_skill"|"without_skill"), run_number, result: { pass_rate, passed, failed, total, time_seconds, tokens, tool_calls, errors }, expectations[] }` (`tool_calls` / `errors` are currently emitted as `0` placeholders but reserved for future instrumentation)
-- `run_summary` — `{ with_skill, without_skill, delta }` each holding `pass_rate` / `time_seconds` / `tokens` stats blocks
-- `differentiating_assertions[]` — assertions where `with_pass_rate − without_pass_rate ≥ 0.5`
-- `notes[]`
+`stddev` is `null` when `n < 2` (single-sample and all-equal must not collide); missing measurements (`time_seconds: null` for a run without `timing.json`) are excluded from `mean` / `stddev` rather than counted as zero — `_cell()` renders them as `"n/a (N missing)"`.
 
-The viewer reads the listed keys exactly; do not rename them.
-
-Also emit `benchmark.md` as a human-readable table. The script produces a summary table plus a per-eval breakdown (verbatim from `aggregate_benchmark.py`):
-
-```
-## Summary
-
-| metric    | with_skill | without_skill | delta  |
-|-----------|------------|---------------|--------|
-| pass_rate | 1.0        | 0.333         | +0.667 |
-| time (s)  | 42.0       | 30.0          | +12.0  |
-| tokens    | 3800       | 2100          | +1700  |
-
-## Per-eval
-
-| eval                  | config        | pass | time  | tokens |
-|-----------------------|---------------|------|-------|--------|
-| extract-table-from-pdf | with_skill    | 3/3  | 42.0s | 3800   |
-| extract-table-from-pdf | without_skill | 1/3  | 30.0s | 2100   |
-```
+Full per-key schema, sample markdown layout, and missing-data semantics: see [`references/step-5-aggregation.md`](references/step-5-aggregation.md).
 
 ---
 
-## Step 6: Unified report
+## Step 6: Unified report — markdown AND HTML
+
+Step 6 produces both artifacts in the same step. The markdown is the source of truth (the renderer parses it for verdict / top-fix narrative); the HTML is the human-facing deliverable. Generate them in this order on the same turn.
+
+### 6a. Scaffold and hand-write `report.md`
 
 `scripts/render_report.py` scaffolds `report.md` from `static.json` and `benchmark.json`:
 
@@ -267,7 +219,22 @@ python3 <this-skill-path>/scripts/render_report.py \
   --out <workspace>/iteration-N/report.md
 ```
 
-`--benchmark` is optional (omitting it produces a static-only report). After scaffolding, hand-write the verdict and the top fix candidates.
+`--benchmark` is optional (omitting it produces a static-only report). After scaffolding, hand-write the verdict and the top fix candidates **in the language of the user's original prompt**. The Top-fix section follows the four-block before/after schema (`problem / before / after / verify`) defined in [`references/proposal-derivation.md`](references/proposal-derivation.md) §5.
+
+### 6b. Render `report.html`
+
+Hand off to the sibling [`skill-eval-viewer`](../skill-eval-viewer/) skill to render the workspace into a single self-contained HTML report:
+
+```bash
+python3 <viewer-skill-path>/scripts/render_html.py <workspace>/iteration-N/ \
+  --title "skill-eval report: <target-skill-name> (iteration-N)"
+```
+
+**Confirm the report language with the user via `AskUserQuestion` before Step 6a**. The two supported chrome languages are `ja` and `en` (the only entries in the viewer's `LOCALES` table). Write `report.md` in the language the user chooses; the viewer auto-detects the same language from `report.md` content and matches the chrome (section titles, verdict labels, before/after kickers, README pointer). The renderer carries no `--lang` flag — the markdown is the source of truth.
+
+This is **part of Step 6**, not an optional follow-up. The HTML adds per-eval description / verdict hero / before-after fix cards that the markdown does not carry, and is the form most users will actually read. Add `--open` if the user wants the browser launched; add `--serve` (with `run_in_background: true`) if they want a localhost URL to share.
+
+Design contract for the HTML (six numbered sections — evals, verdict, static, dynamic, top fixes, files; plugin overview / glossary live in the README, not the report): see `<viewer-skill-path>/references/frontend-design.md`.
 
 Minimal manual format:
 
@@ -290,18 +257,40 @@ Minimal manual format:
 - each differentiating assertion text with (eval_name, with_rate, without_rate)
 
 ## Top issues to fix
-1. (up to 3 items, mixing static and dynamic sources)
+1. (up to 3 items — derivation guidance in `references/proposal-derivation.md`)
 
 ## Files
 - static.json / benchmark.json / runs/eval-*/{with_skill,without_skill}/outputs/
 ```
 
+### Top issues to fix — derivation
+
+The scaffold placeholder requires hand-writing. The Category × Priority schema (inherited from skill-creator `agents/analyzer.md`) plus the perspectives and examples specific to skill-eval are consolidated in [`references/proposal-derivation.md`](references/proposal-derivation.md). The essentials:
+
+- **Draw from four sources**: (a) static FAIL / warn, (b) the flip side of differentiating assertions (`with-only-pass` = a contract to codify; `without-only-pass` = mis-steering to remove), (c) anomalies such as `time ≥ 2×` or `variance > mean × 0.3`, (d) dogfooding gap (axes static_check does not cover: writing quality / placeholder resolution / translation ambiguity / internal consistency / script↔doc drift).
+- **Priority is judged by outcome-changing** — not by effort or subjective importance. The only condition for `high` is: "Without this fix, would the next iteration's benchmark numbers (pass_rate / verdict / differentiating count) have moved?"
+- **At most 3 items**. More invites overfit and cognitive load and makes it impossible to isolate which fix actually worked. The remainder is deferred to the open follow-ups list in `LEARNINGS.md`.
+
+For each fix, always fill in: category (`instructions / tools / examples / error_handling / structure / references`), source (one of the four), and verifiability (a measurable hypothesis for the next iteration).
+
 Verdict heuristics — evaluate in this order, first match wins (the order resolves boundary overlaps). The user makes the final call:
 
-- **Net negative**: `pass_rate delta ≤ 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`)
+- **Net negative**: `pass_rate delta < 0`, OR (`time ≥ 2×` AND `tokens ≥ 2×`). A *negative* delta means with-skill scored worse than without — actionable harm. `delta = 0` is "the skill did nothing" which is wasteful but not actively harmful; it falls into Needs work below.
 - **Ship-ready**: `static score ≥ 0.8` AND `pass_rate delta ≥ +0.2`
-- **Needs work**: any case not caught above (covers `static score 0.4–0.8`, `pass_rate delta` in `(0, +0.2)`, etc.)
+- **Needs work**: any case not caught above (covers `static score 0.4–0.8`, `pass_rate delta` in `[0, +0.2)`, etc.)
 - **Inconclusive** (variance flag, additive — does not displace the above): `runs_per_configuration ≥ 3` AND `stddev > mean × 0.3`. When `runs_per_configuration < 3`, append "single-run, variance not measured" to the report but assign the verdict from the first three rules.
+
+---
+
+## Step 7 (optional): serve the HTML on localhost
+
+The HTML file is already rendered in Step 6b. Step 7 only exists when the user wants `http://127.0.0.1:PORT/report.html` (easier to bookmark / share / inspect with browser devtools than `file://`).
+
+```bash
+python3 <viewer-skill-path>/scripts/render_html.py <workspace>/iteration-N/ --serve --port 8765
+```
+
+Launch via the Bash tool with `run_in_background: true` so the server keeps running. Report the URL and the background task id back to the user. The server binds to loopback only — every file in the workspace is readable to processes on the same host while it runs, so do not place secrets there.
 
 ---
 
