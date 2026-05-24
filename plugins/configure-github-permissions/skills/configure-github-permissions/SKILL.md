@@ -119,7 +119,7 @@ Bash(gh run rerun:*)
 Bash(gh run cancel:*)
 ```
 
-Re-running, canceling, or toggling CI workflows has large side effects.
+Re-running, canceling, or toggling CI workflows has large side effects (CI minutes, deploy triggers, external webhooks). These commands are **not** listed in the user's global CLAUDE.md Tier 3 — `gh run rerun` actually sits in global `permissions.ask` (Tier 2) and the rest are unlisted — but the side-effect blast radius justifies a default-deny in this skill's project-local policy. Override to `ask` per-project if CI re-runs are routine.
 
 ### Cat 10 — gh api low-level: `gh api` low-level invocations (recommended: ask)
 
@@ -136,7 +136,7 @@ That said, there are legitimate GET-only use cases that **only** `gh api` can co
 
 Therefore a blanket `deny` would stop everyday read tasks like PR review tracking and issue metadata retrieval. The default is **`ask`**, with the operational expectation that the user visually verifies the endpoint and method at invocation time.
 
-If `ask` becomes noisy, the recommended approach is to add **path-scoped allow rules for specific GET endpoints** the user hits frequently (e.g. `Bash(gh api repos/*/pulls/*/comments)`). The skill cannot ship such rules as defaults; the user adds them manually. Note that the placeholder syntax must use plain glob `*`, not `{owner}` / `{repo}` literals — Bash permission matching is literal-glob, so curly-brace tokens never match real argv.
+If `ask` becomes noisy, the recommended approach is to add **path-scoped allow rules for specific GET endpoints** the user hits frequently (e.g. `Bash(gh api repos/*/pulls/*/comments)`). The skill cannot ship such rules as defaults; the user adds them manually. Note that the placeholder syntax must use plain glob `*`, not `{owner}` / `{repo}` literals — the official permissions docs at `code.claude.com/docs/en/permissions` only specify `*` as the wildcard; curly-brace placeholders are outside the spec, so they are matched as literal characters and never line up with real argv like `octocat/Hello-World`.
 
 ### Cat 11 — Delete-class: Repository / Issue / Run / Cache / Secret / Variable deletions (recommended: deny)
 

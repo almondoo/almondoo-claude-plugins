@@ -41,9 +41,26 @@
 
 - 「merge / dedupe / conflict 検出を scripts に外出ししないのか」という指摘あり。今回は SKILL 本文に「pure-prompt の意図」を明示する形で対応 (Why this design 末尾)。trigger となるのは: (a) target が `~/.claude/settings.json` にも広がる、(b) gh 以外の tool (npm/pnpm/aws) も同じ category UX に乗る、(c) 並び順に意味付け (semantic grouping) を持たせる、のいずれか。
 
+### 派生変更 (commit message に出ていない調整)
+
+- Step 3 の batch 分割を **4+4+2 → 4+4+3** に変更 (Cat 11 追加に伴う再配置)。
+- README ja/en に **「実行前の推奨 / Before running」** セクションを追加 (backup hint + jq 修復 hint)。
+- README ja の typo「スキア」→「スキル」を修正 (再評価エージェントが検出)。
+
 ### バージョン経緯
 
 - v0.1.1 → v0.1.2 (Cat 5 Tier 3 誤記訂正 + Cat 11 追加 + Step 5/6/7 安全強化 + meta 整合)。
+
+## 2026-05-24 (self-review meta-loop polish v0.1.2 → v0.1.3)
+
+### 残課題の収束
+
+- **Cat 10 の「literal-glob」表現が過剰断言だった**: 「Bash permission matching is literal-glob, so curly-brace tokens never match real argv」と書いていたが、公式 `code.claude.com/docs/en/permissions` は wildcard `*` の挙動しか定義していない。`{...}` placeholder が literal 扱いになるのは「spec 外なので literal として処理される」という論理に書き直し。**教訓: 引用元 doc に存在する語彙だけで主張を組み立てる。doc 外の挙動を引用文体で書くと信頼性を下げる。**
+- **Cat 9 (workflow execution) の Tier 関係性を明示**: Why this design の「Tier-3 categories default to deny」リストに Cat 9 を含めなかった一方、Cat 9 本文では Tier 関係性に言及がなく、なぜ deny default かが Tier フレームワーク上で不明瞭だった。「Tier 3 ではないが副作用大なのでこの skill では deny default、project 単位で `ask` 上書き可」と 1 文追加。
+
+### バージョン経緯
+
+- v0.1.2 → v0.1.3 (Cat 10 spec 引用厳密化 + Cat 9 Tier 注記)。
 
 ## 2026-05-21 (audit-driven cleanup v0.1.0 → v0.1.1)
 
