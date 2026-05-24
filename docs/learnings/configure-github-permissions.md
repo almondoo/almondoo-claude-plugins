@@ -51,6 +51,44 @@
 
 - v0.1.1 → v0.1.2 (Cat 5 Tier 3 誤記訂正 + Cat 11 追加 + Step 5/6/7 安全強化 + meta 整合)。
 
+## 2026-05-24 (UX/structural deepening v0.1.3 → v0.1.4)
+
+イテレーション4 (UXシミュ + 敵対的レビュー + 構造/スケール の 3 視点) で 8 件の修正項目に絞り込み実施。
+
+### UX 起因の実害修正
+
+- **HIGH: pattern 正規化規則を Step 4 に追加**. `Bash(gh pr view *)` (global の space 形式) と `Bash(gh pr view:*)` (skill の colon 形式) は公式仕様上 equivalent だが、string 比較では別物 → 既存ファイルが space 形式だと skill が無自覚に colon 形式で重複追加していた。Step 4 dedupe で「両形式を同パターンと見なす」を明文化。**教訓: skill が出力する記法と既存ファイルの記法が違う場合、normalize 規則を skill 内で明示しないと idempotency が壊れる。**
+- **HIGH: Step 2.5 を新設**. 「11 問答えてから "何も変わりませんでした" と告げられる UX」を回避するため、Step 3 の前に「現状サマリー + Continue / Exit」を提示。preset shortcut (Conservative/Balanced/Aggressive) はさらに大きい構造変更を伴うため次イテに繰越。
+- **MED: Step 3 option.description にカテゴリ固有の要約を強制**. これまでは `Auto-allow (allow) — execute without a prompt every time` の generic 文しか指示せず、ユーザーが Cat 1 と Cat 7 で同じ allow を選ぶ判断材料が options 側に乗らなかった。Cat 1 の sample + 「destructive category の deny は irreversibility を call out すべし」を明示。
+- **MED: Step 5 conflict 質問にプレフィックス**. 「Step 6 preview 後にまとめて適用」の disclaimer をどの conflict 質問にも必須化。「個別 conflict ごとに勝手に書き換わる」誤解を防止。さらに batched 質問の順序を `(array name, then pattern string)` で再現可能化。
+
+### 構造の伸びる余地への対応
+
+- **HIGH: Step 3 batch 分割を `⌈N/4⌉` 式に書き換え**. 4+4+3 の hard-code を残しつつ「将来 cat が増減したら式から再導出」と明文化。これで Cat 12 / 13 を足すたびに Step 3 を手で書き換える必要が消える。
+- **MED: Default selection logic 節を Categories 直前に新設**. これまで Cat 5 / Cat 9 / Cat 10 / Cat 11 にそれぞれ別言で書いていた「なぜこの default か」の判定根拠を 4 ルール (pure-read → allow / external reversible → ask / Tier 3 irreversible → deny / arg-pattern fragile → ask) に集約。新 cat 追加時の判断が機械的になる。
+
+### 価値命題の補強
+
+- **When NOT to Use 段落追加**. 敵対的レビューの「skill ごと存在意義なし」批判への部分的応答。「global で既に充実」「prompt が頻発する前」「単発 1 verb 編集」「team 共有 policy」の 4 つを「使わなくていい case」として明示。これで dead config 量産を skill 側で抑制する責任を持たせる。
+- **description に trigger phrase 追加**: `too many gh prompts` / `edit settings.local.json for gh` / `organize gh permissions` / `auto-approve gh` を直接含めて、敵対的 P3 の trigger 網羅性ギャップを埋め。
+
+### 次イテに繰越した項目
+
+これらは構造インパクト or 設計判断の重さで分離:
+
+- **preset shortcut** (Conservative/Balanced/Aggressive を Step 2.5 と統合): 構造変更が大きい。Step 2.5 の Continue/Exit が落ち着いてから 0.1.5 で実装予定。
+- **global diff mode** (~/.claude/settings.json を読んで effective に同じ entry を skip 提案): merge semantics 再現が必要で実装複雑。0.1.5 以降で検討。
+- **README override シナリオ 2-3 個追加** (敵対 P0a 緩和版): 別 patch で README 重点改修。
+- **記法統一注記の README 追加** (P1b): 同上で README 改修にまとめる。
+- **Cat 5 / Cat 10 弁明文の 50-70% 圧縮** (P2b): 安全に圧縮するには再度評価が必要。
+- **"11 categories" literal 集約** (構造 #4): cat 追加時に同時実施したい。
+- **README Layout 軽量意図注記** (構造 #5): README 改修にまとめる。
+- **evals/evals.json 追加** (構造 #3): trigger 競合 (fewer-permission-prompts / update-config) の評価。skill-creator の専門領域に踏み込むので別タスクで。
+
+### バージョン経緯
+
+- v0.1.3 → v0.1.4 (UX 起因の実害 4 件 + 構造伸びる余地 2 件 + 価値命題 2 件 = 計 8 件)。
+
 ## 2026-05-24 (self-review meta-loop polish v0.1.2 → v0.1.3)
 
 ### 残課題の収束

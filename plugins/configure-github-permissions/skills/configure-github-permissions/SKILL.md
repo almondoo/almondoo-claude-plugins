@@ -1,6 +1,6 @@
 ---
 name: configure-github-permissions
-description: Interactively configure GitHub CLI (gh) permissions in the **project-local** `.claude/settings.local.json` (not the committed `.claude/settings.json`, not the user-global `~/.claude/settings.json`) by asking the user category-by-category which gh operation groups should be `allow` / `ask` / `deny`. Use when the user wants to set up gh permissions, reduce gh prompt frequency, allowlist GitHub commands, configure which gh operations are auto-allowed, blocked, or prompt-on-use, or mentions setting up gh allowlist / permission tier / per-category permissions for a project. Walks through 11 categories (read-only, local ops, comment, issue create/edit, issue close, pr create/edit, pr merge/close, release, workflow run, gh api, delete-class) via AskUserQuestion, then merges the resulting `Bash(gh ...)` entries into `permissions.{allow,ask,deny}` without duplication. Prefer this skill over `fewer-permission-prompts` when the user wants an upfront category-based gh setup rather than transcript-driven cleanup; prefer this over `update-config` when the target is specifically `gh`, not arbitrary commands.
+description: Interactively configure GitHub CLI (gh) permissions in the **project-local** `.claude/settings.local.json` (not the committed `.claude/settings.json`, not the user-global `~/.claude/settings.json`) by asking the user category-by-category which gh operation groups should be `allow` / `ask` / `deny`. Use when the user wants to set up gh permissions, reduce gh prompt frequency, allowlist GitHub commands, configure which gh operations are auto-allowed, blocked, or prompt-on-use, mentions "too many gh prompts", says "edit settings.local.json for gh" / "organize gh permissions" / "auto-approve gh", or mentions setting up gh allowlist / permission tier / per-category permissions for a project. Walks through 11 categories (read-only, local ops, comment, issue create/edit, issue close, pr create/edit, pr merge/close, release, workflow run, gh api, delete-class) via AskUserQuestion, then merges the resulting `Bash(gh ...)` entries into `permissions.{allow,ask,deny}` without duplication. Prefer this skill over `fewer-permission-prompts` when the user wants an upfront category-based gh setup rather than transcript-driven cleanup; prefer this over `update-config` when the target is specifically `gh`, not arbitrary commands.
 ---
 
 # Configure GitHub Permissions
@@ -26,6 +26,24 @@ A skill that configures `gh` command permissions in the project's `.claude/setti
 - A new project is being set up and `gh issue view` etc. prompt every time.
 - A `fewer-permission-prompts`-style request targets `gh` operations.
 - The user wants to explicitly block destructive operations (merge / release delete / etc.).
+
+## When NOT to Use
+
+- **The user's global `~/.claude/settings.json` already covers their `gh` usage** and project-local override is not needed. Running the skill in that case mostly produces 0-addition runs and pads `.claude/settings.local.json` with entries the global policy already handles. Tell the user to inspect `~/.claude/settings.json` first.
+- **No `gh` prompts are firing in practice.** Pre-emptively populating 11 categories worth of allow/ask/deny for verbs the user never invokes creates dead config without value. Wait until the user is actually friction-bound.
+- **The user wants a one-off tweak to a single verb** (e.g. "just allow `gh pr view`"). Hand-edit `.claude/settings.local.json` or use the `update-config` skill — running an 11-category wizard for one entry is disproportionate.
+- **The user wants a team-shared policy** committed into `.claude/settings.json`. The skill is hard-fixed to the gitignored local file. Edit the committed file by hand after the team agrees.
+
+## Default selection logic
+
+The recommended default for each category is derived from four rules. The same logic should be used to decide the default of any new category added in the future.
+
+1. **Pure-read, no side effects → `allow`.** Read-only verbs (`view` / `list` / `status` / `diff` / `checks` / `search`) and locally-scoped no-op verbs (`gh pr checkout` = local branch creation, `gh browse` = browser launch) cannot mutate remote state, so prompting on them is pure friction.
+2. **External-visible but reversible → `ask`.** Verbs that produce subscriber-visible side effects (comments, reviews, issue create / close / reopen, PR create / edit / ready) can be edited or undone after the fact, so per-invocation user verification is the right balance between safety and friction.
+3. **Effectively irreversible external write → `deny`.** Verbs the user's global CLAUDE.md treats as Tier 3 (PR merge, PR close, release create / edit / delete, repo delete, issue delete) must not be auto-allowed by any project policy. Side-effect-heavy verbs with large blast radius (workflow run / enable / disable / cancel, run rerun) follow the same rule even when not explicitly Tier 3 in global settings, because the override-to-`ask` cost is low.
+4. **Argument-pattern matching is fragile → `ask`.** `gh api` switches HTTP methods via `-X` and data flags, and Bash permission patterns cannot reliably isolate the method. The skill cannot ship a path-scoped allowlist as a default, so the safe baseline is per-invocation prompt.
+
+When a category sits between two rules (e.g. `gh issue close` is Tier 2 but fires external notifications), prefer the **less destructive** default (here: `ask`, not `deny`) and let the user override via this skill's per-category prompt or via their own CLAUDE.md.
 
 ## Categories
 
@@ -165,52 +183,69 @@ The target is that path + `/.claude/settings.local.json`. Read the existing cont
 
 Read the three arrays `permissions.allow` / `permissions.ask` / `permissions.deny`. Entries already in those arrays are treated as "previously configured by the user" and preserved.
 
-### Step 3: Ask the 11 categories via AskUserQuestion batches
+### Step 2.5: Show current state and offer an early exit
 
-**Always use AskUserQuestion** (asking via plain text is prohibited). AskUserQuestion accepts at most 4 questions per message, so split the 11 categories into **3 batches**:
+Before walking the user through 11 questions, summarize what is already present and let them opt out. This prevents the "answer 11 questions, get told nothing changed" experience.
 
-**Batch 1** (4 questions):
-1. Cat 1 — Read-only
-2. Cat 2 — Local ops
-3. Cat 3 — Comments & reviews
-4. Cat 4 — Issue create/edit
+Render the summary as concise text (not via AskUserQuestion, which is for choices, not for display):
 
-**Batch 2** (4 questions):
-5. Cat 5 — Issue close/reopen
-6. Cat 6 — PR create/edit
-7. Cat 7 — PR merge/close
-8. Cat 8 — Release ops
+- Total `gh ...` entries already in `permissions.allow` / `ask` / `deny`, with one or two example patterns each.
+- A coverage hint: of the 11 categories, how many appear "already configured" (≥1 entry from that category present in any array) vs "untouched".
 
-**Batch 3** (3 questions):
-9. Cat 9 — Workflow execution
-10. Cat 10 — gh api low-level
-11. Cat 11 — Delete-class
+Then ask via AskUserQuestion (1 question):
+
+- question: `Continue with the 11-category walkthrough, or exit now?`
+- options:
+  - `Continue (walk through all 11 categories)` (recommended when the user explicitly requested a setup pass)
+  - `Exit (current settings look correct)` (recommended when the user only wanted to inspect what is there)
+
+If `Exit` is chosen, report the summary and stop. If `Continue`, proceed to Step 3.
+
+### Step 3: Ask the categories via AskUserQuestion batches
+
+**Always use AskUserQuestion** (asking via plain text is prohibited). AskUserQuestion accepts **at most 4 questions per message**, so split the N categories into **⌈N/4⌉ batches**. For the current 11 categories that gives 3 batches of 4 + 4 + 3:
+
+- **Batch 1** (4): Cat 1 Read-only / Cat 2 Local ops / Cat 3 Comments & reviews / Cat 4 Issue create/edit
+- **Batch 2** (4): Cat 5 Issue close/reopen / Cat 6 PR create/edit / Cat 7 PR merge/close / Cat 8 Release ops
+- **Batch 3** (3): Cat 9 Workflow execution / Cat 10 gh api low-level / Cat 11 Delete-class
+
+If the category set grows (or shrinks) in a future version, re-derive the batches from the same `⌈N/4⌉` rule rather than maintaining a hard-coded list.
 
 Each question takes this shape:
 
-- **question**: `How should the gh commands in "<category-name>" be handled?` — keep the question body short. Do **not** inline the full command list in the question text; AskUserQuestion question / option strings have practical length limits and a 19-item list (e.g. Cat 1) breaks the UI. Put the concise category name in `header` and let the description of each option carry one-line summaries; the SKILL body above is the authoritative command list and the user can ask for it.
+- **question**: `How should the gh commands in "<category-name>" be handled?` — keep the question body short. Do **not** inline the full command list in the question text; AskUserQuestion question / option strings have practical length limits and a 19-item list (e.g. Cat 1) breaks the UI.
 - **header**: A short identifier for the category (max 12 chars, e.g. `Read-only`, `PR merge`, `gh api`, `Delete`).
 - **multiSelect**: `false`
-- **options**: 3 entries. **Put the recommended choice first and append `(recommended)` to its label.**
-  - `Auto-allow (allow)` — execute without a prompt every time.
-  - `Ask every time (ask)` — prompt before execution.
-  - `Auto-deny (deny)` — block execution.
+- **options**: 3 entries. **Put the recommended choice first and append `(recommended)` to its label.** Use each option's `description` field to carry a one-line summary of what the choice means **for this specific category**, including a 3–5 verb sample so the user is not selecting blind. Example for Cat 1 (Read-only):
+  - label `Auto-allow (allow) (recommended)` — description: `Run gh view / list / status / diff / checks / search without a prompt. Safe — these are pure reads.`
+  - label `Ask every time (ask)` — description: `Prompt before each read. Useful in audit-heavy contexts.`
+  - label `Auto-deny (deny)` — description: `Block all gh read verbs in this project. Rare.`
+
+For destructive categories (Cat 7 / 8 / 11), make the recommended `deny` option's description explicitly call out the irreversibility (e.g. `Block gh pr merge / close — these are effectively irreversible external writes`). The user must be able to tell apart a "safe allow" from a "Tier-3 deny" by reading the option, not by guessing from the category name.
 
 ### Step 4: Route the answers into allow / ask / deny
 
 For each category's selected choice, place every command pattern in that category as a candidate for the corresponding array. Union with the existing array and extract **only the new additions**.
 
+**Pattern equivalence for dedupe.** The Claude Code permission docs treat trailing wildcards in two equivalent forms: `Bash(gh pr view *)` (space + wildcard) and `Bash(gh pr view:*)` (colon-prefixed wildcard). They match the same argv. The skill emits the colon form for new entries, but the user's existing entries (often inherited from `~/.claude/settings.json`, which uses the space form) may be in either notation. **Treat the two forms as the same pattern during dedupe**: when checking whether `Bash(gh pr view:*)` is already present, also match `Bash(gh pr view *)`. Without this, the skill double-adds entries on every run and `permissions.allow` grows redundantly. Use a simple normalization (e.g. replace the final `:*` with ` *` or vice versa before comparing) — the goal is "no semantically duplicate lines after writing", not full glob equivalence.
+
 ### Step 5: Conflict check
 
 If a new entry to be added already exists in a different array (e.g. trying to add to `allow` while it already sits in `deny`), it is a **conflict**.
 
-For each conflict, ask via AskUserQuestion (singly or batched per message):
+For each conflict, ask via AskUserQuestion (singly or batched per message). **Prefix every conflict question with the same one-line disclaimer** so the user knows their answers are not applied until Step 6:
+
+> `(Your answers here are collected and shown in a single preview at Step 6. Nothing is written to the file until you approve that preview.)`
+
+This prefix is required — without it, users frequently assume each conflict answer commits immediately and either freeze on the prompt or pick "Keep existing" defensively.
 
 - question: `"Bash(gh xxx:*)" is already in deny. Move it to allow?`
 - options:
   - `Keep existing deny` (drop the new allow)
   - `Remove from deny and move to allow`
-  - `Keep both` (in option `description`, explain that the official Claude Code permission docs at `code.claude.com/docs/en/permissions` state **deny takes precedence over allow when patterns overlap**, so the effective behavior remains "blocked"; this option only matters as an audit trail)
+  - `Keep both` (in option `description`, briefly note that `code.claude.com/docs/en/permissions` defines evaluation order as **deny → ask → allow with deny always taking precedence**, so effective behavior stays "blocked"; this option is only useful as an audit trail. Keep the description under ~150 characters to stay within AskUserQuestion's practical option-description budget.)
+
+When batching multiple conflicts into one AskUserQuestion call, order them by **(array name, then pattern string)** so the order is reproducible across runs.
 
 If the user cancels mid-conflict-resolution (closes the AskUserQuestion or chooses an explicit cancel), abort the entire flow without writing — same policy as a mid-batch cancel in Step 3. Partial conflict resolution must not be persisted.
 
