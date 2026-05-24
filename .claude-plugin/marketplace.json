@@ -28,7 +28,7 @@
       "name": "parallel-audit",
       "description": "Multi-agent parallel audit of CLAUDE.md, CLAUDE.local.md, AGENTS.md, GEMINI.md, or SKILL.md files for cross-section contradictions, missing qualifiers, terminology drift, and unstated premises. Use this skill whenever the user asks to audit, review, verify, quality-check, or convergence-check one of these files — even without the word \"audit\" — or mentions a recent refactor, a rule being ignored, observed behavior drift, a pre-shipping check before publishing a plugin, or accumulated session learnings. Dispatches N independent subagents (default 3), keeps only findings flagged by ≥threshold (default 2), classifies redundancy, then proposes targeted fixes with per-fix user approval. Do NOT use for writing a new instruction file (use skill-creator), updating with session learnings (use revise-claude-md), or auditing source code or non-markdown configs.",
       "source": "./plugins/parallel-audit",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "category": "productivity",
       "keywords": [
         "audit",

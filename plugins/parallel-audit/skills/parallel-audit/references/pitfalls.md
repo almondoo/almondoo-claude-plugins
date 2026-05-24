@@ -26,6 +26,12 @@ Pitfalls observed across parallel-audit invocations. Read at Phase 1 if you're n
 - **Using single-proposal mode for substantive fixes** → forcing the user into "Apply / Skip / Modify (free text)" wastes their time. Use multi-option mode when the fix is substantive.
 - **Retrying auto-mode-blocked Edits blindly** → without explicit AskUserQuestion authorization, the classifier blocks every retry. Follow the `references/claude-md-specifics.md` playbook.
 - **Ignoring `rule_burden_impact: INCREASES_MAJOR`** → adding rules has real cost. Surface major increases in the AskUserQuestion description, do not bury.
+- **Applying overlapping fixes in approval order** → two fixes touching the same line span (or within ±2 lines) cause the second Edit to fail (or worse, land in the wrong location). Apply per the Phase 11 line-range conflict pre-check: group transitively by overlap, sort groups bottom-up by max line number, apply within-group bottom-up, re-Read + re-verify `before` text between fixes in a group, re-dispatch `fix-safety-checker` on any stale `before`, never use an "Apply-as-is" bypass.
+- **Applying non-overlapping fixes without re-Read between groups** → INSERT/REMOVE-class fixes in one group shift line numbers for downstream groups; the bottom-up group ordering converts this from "shifts upstream" (corrupting) to "shifts already-applied" (no-op), but only if you ordered groups correctly. If you skip the between-group re-Read, downstream fixes get stale line numbers.
+
+## Phase 2 input validation
+
+- **Silently coercing invalid `N` / `threshold` / `max_iterations` to defaults** → user expects validation to surface their mistake, not invisible correction. Re-ask up to 3 times with the violated constraint stated; after the 3rd failed attempt, present an AskUserQuestion offering defaults / abort / one-more-attempt — never silently coerce. Constraints: `2 ≤ N ≤ 9`, `2 ≤ threshold ≤ N − 1`, `2 ≤ max_iterations ≤ 10`. `threshold == N` is rejected because `(N − threshold + 1) = 1` makes a single clean instance vacuously satisfy practical convergence; `max_iterations = 1` is rejected because Phase 11.5(a)'s `iteration < max_iterations` gate would never fire.
 
 ## Target-specific
 

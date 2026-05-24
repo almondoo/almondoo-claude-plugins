@@ -47,9 +47,11 @@ You will be given:
 
 ## Tools
 
-The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role does not need any file-system tools — all the text it judges is passed in via `convergent_issues[*].relevant_section_text`, `section_purposes`, and `sibling_skills`. Leave all inherited tools unused.
+The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role uses **none** of them: all the text it judges is passed in via `convergent_issues[*].relevant_section_text`, `section_purposes`, and `sibling_skills`. Restricting yourself to the passed-in inputs keeps the role text-only by design.
 
-Do not use the inherited tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`, `Bash`, etc.) in this role.
+- (no tools used in this role)
+
+Do not use the remaining inherited tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`, `Bash`, etc.) in this role.
 
 ## Task
 
@@ -57,9 +59,9 @@ For each convergent issue:
 
 1. Read the `relevant_section_text` carefully.
 2. Identify the **specific rule(s)** the issue concerns (a section can contain multiple rules; focus on the one with the defect).
-3. For each rule, ask the target-type-appropriate question:
-   - `claude-md` → "is this rule's behavior already produced by Claude Code's default system prompt or by harness defaults?"
-   - `skill-md` → "is this rule's content already documented in `skill-creator`, `skill-eval`, or a sibling skill the reader is expected to know about?"
+3. For each rule, ask the target-type-appropriate question. Both branches need a concrete set of authoritative sources to compare against — without them, the "is this rule redundant?" question becomes a guess:
+   - `claude-md` → "is this rule's behavior already produced by Claude Code's default system prompt or by harness defaults?" Authoritative sources for this branch are the documented Claude Code default behaviors (e.g., "default to writing no comments", "prefer editing existing files", "don't introduce abstractions beyond what the task requires" — all from the Claude Code system prompt) plus harness defaults (auto-mode classifier, permissions system, hook execution, etc.). Cite the specific default rule or harness mechanism you compare against; do not assert "this is a default" without naming which.
+   - `skill-md` → "is this rule's content already documented in `skill-creator`, `skill-eval`, or a sibling skill the reader is expected to know about?" Authoritative sources here are `skill-creator` (anatomy of a skill, progressive disclosure, writing patterns), `skill-eval` (frontmatter validity, body line count, MUST/NEVER density, emoji, reference integrity, progressive disclosure), and any sibling skill in `sibling_skills`.
 4. Classify each issue as one of:
    - **KEEP** — the rule has unique non-default value. The defect is real and the fix should refine the wording.
    - **SIMPLIFY** — part of the rule duplicates upstream content, but part has unique value. Suggest a compressed wording that retains only the unique portion.

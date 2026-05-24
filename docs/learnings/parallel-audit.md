@@ -4,6 +4,97 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-24 (1.2.5 → 1.2.6 — iter-6 mop-up fix, asymptote 到達近接)
+
+### 経緯
+
+iter-5 commit 直後の iter-6 で 7軸再評価。**HIGH 6 件中 cross-axis dedup 後 2 件の distinct defect** に縮減 — iter-5 の Phase 11 rewrite と input validation extension は実質的に sound (axis-6 が H6 algorithm を mental test して "correct partitions" を確認)。残った HIGH は **iter-5 fix の半端適用 + 新たに発見された off-by-one**。axis-4 + axis-7 は 0 finding で全クリーン。
+
+### iter-6 評価結果
+
+| Axis | Findings | HIGH |
+|---|---|---|
+| 1 | 6 | 1 |
+| 2 | 6 | 1 (MED-HIGH, V1 downgrade で MED) |
+| 3 | 3 | 0 |
+| 4 | 0 | 0 (ship as-is) |
+| 5 | 4 | 1 |
+| 6 | 9 | 3 |
+| 7 | 0 | 0 (clean) |
+| **計** | **28** | **6** |
+
+### iter-6 FP-recheck
+
+3 FP-verifier ≥2/3 集約:
+
+- V1: 26 REAL / 2 FALSE (axis-2.N5/N6) / 1 NEEDS_HUMAN (axis-6.M4), HIGH: 2
+- V2: 30 REAL / 0 FALSE / 0 NEEDS_HUMAN, HIGH: 5 (axis-5.F1 + axis-6.H1 を kept HIGH)
+- V3: 25 REAL / 2 FALSE (axis-2.N5/N6) / 1 NEEDS_HUMAN (axis-6.M4), HIGH: 2
+
+**≥2/3 HIGH 確定 (2 distinct defects)**:
+1. axis-1.F1 ≡ axis-6.H2: L73-L75 Configuration parameters table が iter-5 の L133-L136 validation extension と sync していない (iter-5 半端適用)
+2. axis-6.H3: `max_iterations=1` を L136 が許容するが L328 の `iteration < max_iterations` gate は never fire (off-by-one, silently skips Phase 11.5(a))
+
+### iter-6 fix 適用 (1.2.6 反映)
+
+**HIGH cluster (2 distinct → 2 edits)**:
+
+| Cluster | 対象 | 内容 |
+|---|---|---|
+| D1 (1.F1 / 6.H2) | SKILL.md L73-L75 | Configuration parameters table 3 行を L133-L136 validation と完全同期: N upper bound 9, threshold ≤ N-1 + threshold==N rejection 説明, max_iterations 2-10 + L328 gate 説明 |
+| D2 (6.H3) | SKILL.md L136 | max_iterations 下限 1 → 2 に修正 + 理由を L328 の `iteration < max_iterations` gate との整合に明示 |
+
+**MED cluster (5 distinct → 5 edits)**:
+
+| Cluster | 対象 | 内容 |
+|---|---|---|
+| D3 (1.F3 / 6.M1) | SKILL.md Phase 11 step 3 | within-group apply order を bottom-up by `line_range.start` で明示 (再現性確保、ties は `max-end` 次いで lexicographic `issue_id`) |
+| D4 (1.F2 / 6.L1) | SKILL.md Phase 11 step 3(c) | Phase 9 escalation citation を再構成: "intentionally skips Phase 9's re-draft-once stage" + Modify loop cap 3 で unbounded 防止 + UNSAFE 原因 (fix #Y landed first and shifted file) prefix 追加 |
+| D5 (5.F1) | SKILL.md L137 abort path | "abort and re-invoke" を 3-option AskUserQuestion に: defaults / abort / one-more-attempt + abort 時の summary で user recovery 支援 |
+| D6 (5.F2) | SKILL.md L322 Phase 11 confirmation | "Phase 10 approval order" で list (not apply-order) + re-sequencing 起きた場合の prefix 追加 |
+| D7 (2.N1 + 2.N2) | redundancy-checker.md ## Tools + ## Task step 3 | (a) Tools section template を invert (allow-list 形式に揃える、empty allow-list を明示)、(b) claude-md branch にも authoritative source enumeration 追加 (system prompt defaults + harness defaults) — skill-md branch との非対称解消 |
+
+**LOW (1 edit)**:
+
+| Cluster | 対象 | 内容 |
+|---|---|---|
+| D8 (3.F1 + 3.F2) | pitfalls.md "Fix proposal & apply" + 新節 "Phase 2 input validation" | overlap pre-check 2 件 + input validation 2 件 = 4 件の pitfall entry を追加 (audit trail として将来 regression 防止) |
+
+### 不対応 (NEEDS_HUMAN または scope 軽量過ぎ)
+
+iter-6 verifier が REAL 認定したが iter-7+ または保留:
+
+- **axis-2.N3** (LOW): fix-safety-checker L33/L42 "Read in full" asymmetry — minor wording
+- **axis-2.N4** (LOW): FP-detector Tools→Task Grep pointer 一方向 — Task step 3 が "use Grep here" を明示すべき
+- **axis-2.N5/N6** (FALSE): rejection 確定
+- **axis-3.F3** (LOW): shared-blind-spots L34 phrasing nit
+- **axis-4.F4** (LOW): README Phase 11 summary が overlap pre-check 言及せず — longstanding summarization-depth choice (iter-3 axis-4 既に non-finding 判定)
+- **axis-5.F3** (MED): UNSAFE escalation cause attribution — D4 で大半カバー
+- **axis-5.F4** (LOW): cost amplification — Known limitations 既存記載でカバー
+- **axis-6.M2** (LOW/MED V split): non-integer/negative/non-numeric — D1 L133 で部分カバー
+- **axis-6.M3** (MED): whole-file group cost amplification (axis-5.F4 cluster)
+- **axis-6.M4** (NEEDS_HUMAN): `"3.0"` coercion policy
+- **axis-6.L1/L2/L3**: minor wording
+
+### asymptote 判定
+
+iter-4: 10 HIGH → iter-5: 12 HIGH → iter-6: 6 HIGH → iter-7 予測: HIGH < 3
+
+**plateau / asymptote signal**:
+- Axis 4 (docs consistency) + Axis 7 (security) が iter-6 で 0 finding
+- HIGH count が 12 → 6 で半減
+- iter-6 で発見された 2 HIGH の distinct defect 数は iter-4 の 6 と比較し 1/3 に減少
+- 残存 finding の多くは "polish" / "wording precision" カテゴリ (LOW) または NEEDS_HUMAN
+
+iter-7 で 0 HIGH (または HIGH 全件 NEEDS_HUMAN) なら **plateau / asymptote 確認** → 「修正物がなくなった」判定で完了。
+iter-7 で再び iter-6 fix の regression が発見されれば mop-up を継続。
+
+### iter-6 で得た meta 教訓
+
+- **2 axes が完全 clean (Axis 4 + Axis 7)** は **subsystem 別の収束** を示す: docs consistency と security は構造的問題が解消され、残るは prose-level polish のみ
+- **Cross-axis dedup** は iter が進むほど heavy: iter-6 では HIGH 6 → distinct 2、つまり 3 verifier が同じ defect を 3 つの axis から発見していた。iter-7 ではさらに集中度が上がる予想
+- **iter-4 → iter-5 → iter-6 の "regression detection rate" decay** はベイズ的に: iter-5 で iter-4 の bug 検出効率が高かった (12 HIGH)、iter-6 で iter-5 の bug 検出効率は半分 (6 HIGH)、iter-7 で iter-6 の bug 検出はさらに少ない予想 — これが「fix the fix」サイクルの自然な収束
+
 ## 2026-05-24 (1.2.4 → 1.2.5 — iter-5 7軸再評価で iter-4 regression を発見 + 大幅 fix)
 
 ### 経緯
