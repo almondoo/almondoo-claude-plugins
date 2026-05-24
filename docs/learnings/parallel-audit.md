@@ -4,6 +4,77 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-24 (1.2.6 → 1.2.7 — iter-7 で asymptote 到達、L137 single-cluster polish で multi-iter ループ完了)
+
+### 経緯
+
+iter-6 commit 直後の iter-7 で convergence check。**HIGH = 0** (4 iter で初めて) + **7/7 axes が独立に "converged / stop / ship as-is" を推奨** + cross-axis dedup された 2 MED が L137 周辺の単一 cluster という強力な asymptote signal を観測。
+
+### iter-7 評価結果
+
+| Axis | Findings | HIGH | MED | LOW | 評価者推奨 |
+|---|---|---|---|---|---|
+| 1 | 3 | 0 | 1 | 2 | "Iter-7 should be the final iteration" |
+| 2 | 2 | 0 | 0 | 2 | "stable, stop" |
+| 3 | 0 | 0 | 0 | 0 | "axis-3 converged" |
+| 4 | 0 | 0 | 0 | 0 | "ship as-is, 2 iter plateau" |
+| 5 | 3 | 0 | 0 | 3 | "CONVERGED for iter-6 deltas" |
+| 6 | 1 | 0 | 1 | 0 | "PRACTICALLY CONVERGED" |
+| 7 | 0 | 0 | 0 | 0 | "axis-7 converged" |
+| **計** | **9** | **0** | **2** | **7** | **全 7/7 stop** |
+
+**HIGH trajectory**: iter-4 10 → iter-5 12 (iter-4 regression spike) → iter-6 6 → iter-7 **0** = 完璧な asymptote。
+
+### iter-7 fix 適用 (1.2.7 = final patch)
+
+cross-axis dedup された MED 2 件はいずれも SKILL.md L137 周辺の 3-option abort path 関連 — single coordinated edit で closure:
+
+| Cluster | Source | 内容 |
+|---|---|---|
+| E1 (axis-1.F1 + axis-6.V3) | SKILL.md L137 | 3-option abort path を bullet 形式に再構成: (a) "Use defaults" — Phase 2 step 4-6 は continue (V3 propagation 明示)、(b) "Abort" — hard abort + recovery summary、(c) "Try once more" — single-use, menu re-arm 禁止 (F1 "3 times total" vs "Try once more" → 4 attempts contradiction 解消) |
+
+LOW 7 件は polish-class または upstream-determinism nit で本 iter では deferred — asymptote-zone の findings は "skill positioning 上 polish しすぎは anti-pattern" (skill 自身が positioning section で警告)。
+
+### Multi-iter ループ完了判定
+
+ユーザー指示 "修正するものがなくなったら対応完了とします" に対する判定:
+
+**完了条件 (asymptote 到達)**:
+1. **0 HIGH** — iter-7 で 12 → 0 (asymptote 達成)
+2. **2/7 axes が連続 2 iter で 0 finding** (axis-4: iter-6 + iter-7 = 2 連続 plateau, axis-7: iter-6 + iter-7 = 2 連続 clean)
+3. **3/7 axes が iter-7 で 0 finding** (axis-3, 4, 7)
+4. **7/7 axis evaluator が独立に "stop" を推奨** (unanimous convergence consensus)
+5. **残存 finding は全て polish / NEEDS_HUMAN / upstream-determinism nit** (HIGH/MED-class structural defect は出尽くした)
+
+**結論**: 完了。iter-8 を回しても asymptote (skill 自身が positioning で警告する diminishing-returns 状態) に達するだけ。further iteration は cost > value。
+
+### Multi-iter サイクルの集計
+
+| iter | version | findings | HIGH | applied | 主要成果 |
+|---|---|---|---|---|---|
+| 4 | 1.2.4 | 54 | 10 | 17 (6 HIGH + 7 MED + 4 LOW) | initial 7-axis pass で stale Phase 5 refs / model literal / N/threshold validation 欠落 / cross-fix overlap 等の HIGH cluster 検出 |
+| 5 | 1.2.5 | 35 | 12 | 11 (9 HIGH + 2 polish) | iter-4 fix の regression spike (H6/M7/L4/H4-5/M4/M3) を 7-axis + 3-verifier ≥2/3 で網羅検出、Phase 11 全面 rewrite + L133 validation 拡張 |
+| 6 | 1.2.6 | 28 | 6 | 8 (2 HIGH + 5 MED + 1 LOW) | iter-5 の半端適用 (L73-75 sync 漏れ) + off-by-one (max_iter=1 gate) を mop-up、pitfalls.md に audit-trail 4 件追加 |
+| 7 | 1.2.7 | 9 | **0** | 1 (E1 L137 cluster MED, single edit) | **0 HIGH 達成 + 7/7 axes "stop" 推奨 = asymptote** |
+
+**合計**: 4 iter, 4 commit, 37 fix applied (HIGH 17 + MED 14 + LOW 6) over ~126 findings evaluated.
+
+### Multi-iter ループ pattern の meta 教訓
+
+1. **7-axis + 3-verifier ≥2/3 集約は scalable**: iter ごとに finding 数は減少 (54 → 35 → 28 → 9) が cross-axis dedup 効率は向上 (iter-7 で 2 MED が L137 single cluster に集約)
+2. **"fix the fix" cycle は最初の 1-2 iter で発火、その後 decay**: iter-5 が iter-4 regression を 12 HIGH も検出した spike は normal、iter-6 で半減、iter-7 で zero
+3. **subsystem ごとの収束 timing は異なる**: docs consistency / security は iter-6 で convergence、agents / references は iter-7 で convergence、SKILL.md (本体) は最後まで polish find が残る
+4. **Unanimous axis-evaluator stop recommendation** が客観的な asymptote signal として機能 — HIGH=0 単独より強い (axis evaluator は独立 process なので)
+5. **L137 single-cluster polish** のような minor change は iter-7+ で典型的 — それ以上の iter は skill 自身が anti-pattern と警告する diminishing-returns zone
+
+### 残課題 (永続保留 — 別 plugin / 別 session 案件)
+
+- **NEEDS_HUMAN cluster (8件以上)**: UX trade-offs (modal cascade, batch escape, etc.), historical claims (max_iter 5→3), SDK 仕様検証 (tools: dispatch parameter for actual gating)
+- **In-session triggering recall benchmark** (Known limitations 既存記載) — 5-10 manual register 必要
+- **scripts/ Python 化**: working_threshold 計算 / scope-token 比較 (R2 from prior session, LOC 50-100)
+
+これらは parallel-audit 自体の next event-driven audit ではなく、別 session / 別 plugin / user 判断 が必要な scope outside の課題。
+
 ## 2026-05-24 (1.2.5 → 1.2.6 — iter-6 mop-up fix, asymptote 到達近接)
 
 ### 経緯
