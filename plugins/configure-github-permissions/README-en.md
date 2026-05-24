@@ -8,7 +8,7 @@ Coarse presets like "allow read-only, ask everything else" cannot express realis
 
 ## How it works
 
-It walks through 10 categories × 3 choices across 3 `AskUserQuestion` batches:
+It walks through 11 categories × 3 choices across 3 `AskUserQuestion` batches:
 
 | # | Category | Default |
 |---|---|---|
@@ -16,12 +16,13 @@ It walks through 10 categories × 3 choices across 3 `AskUserQuestion` batches:
 | 2 | Local operations (`gh pr checkout`, `gh browse`) | `allow` |
 | 3 | Comments & reviews (`gh issue/pr comment`, `gh pr review`) | `ask` |
 | 4 | Issue create / edit | `ask` |
-| 5 | Issue close / reopen | `deny` |
+| 5 | Issue close / reopen | `ask` |
 | 6 | PR create / edit / ready | `ask` |
 | 7 | PR merge / close | `deny` |
 | 8 | Release operations (create / edit / upload / delete) | `deny` |
 | 9 | Workflow execution (`workflow run`, `run rerun`, …) | `deny` |
 | 10 | `gh api` low-level | `ask` |
+| 11 | Delete-class (`gh repo/issue/run/cache/secret/variable delete`) | `deny` |
 
 After collecting answers, the skill:
 
@@ -41,11 +42,20 @@ It does not touch keys other than `permissions.{allow,ask,deny}` and preserves t
 
 ## Usage
 
+Invoke explicitly via slash command:
+
 ```
 /configure-github-permissions:configure-github-permissions
 ```
 
-The skill activates automatically when the user asks to *"configure gh permissions"* / *"reduce gh prompts"* / *"allowlist GitHub commands"* / *"set up per-category permissions for this project"*, or mentions allowlist / permission tier / `gh` deny-rule setup.
+It also activates from natural language. The skill matches when the user asks *"configure gh permissions"* / *"reduce gh prompts"* / *"allowlist GitHub commands"* / *"set up per-category permissions for this project"*, or mentions allowlist / permission tier / `gh` deny-rule setup.
+
+The write target is **fixed to the project's `.claude/settings.local.json`**. The committed `.claude/settings.json` and the user-global `~/.claude/settings.json` are deliberately out of scope — team-wide gh policy must be hand-placed elsewhere.
+
+## Before running
+
+- **Want to keep your existing `.claude/settings.local.json`?** Back it up first: `cp .claude/settings.local.json .claude/settings.local.json.bak`. The skill itself is idempotent (a second run is a no-op), but Step 5 (conflict resolution) is the one place where an existing entry can be moved between arrays — and "moved" means "removed from the source array".
+- **Don't re-run on broken JSON.** The skill detects a parse failure and aborts. Run `jq . .claude/settings.local.json` to pinpoint the syntax error first.
 
 ## Layout
 
