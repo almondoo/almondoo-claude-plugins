@@ -47,8 +47,8 @@
 
 ## Known limitations
 
-- **In-session triggering recall は未検証**: skill-creator の `claude -p` backend では recall=0% (4 件の should-trigger eval で 0/4 hit)。実 Claude Code session での triggering は別経路だが、in-session の recall は未計測。確実に発火させたいときは `/parallel-audit:parallel-audit` で明示起動してください。
-- **Should-trigger eval は trace review 止まり**: AskUserQuestion が subagent をブロックするため、肯定ケース (eval id 1-4) は end-to-end ベンチマーク未実施。否定ケース (eval id 5-7) のみ end-to-end 検証済み。
+- **In-session triggering recall は未検証**: skill-creator の `claude -p` backend では recall=0% (測定時点の should-trigger eval 4 件で 0/4 hit; 当時の eval id 1-4)。後に id 8 (deep-tier n=9 opt-in) が追加され、現在は should-trigger 5 件あるが id 8 は recall 未計測。実 Claude Code session での triggering は別経路だが、in-session の recall も未計測。確実に発火させたいときは `/parallel-audit:parallel-audit` で明示起動してください。
+- **Should-trigger eval は trace review 止まり**: AskUserQuestion が subagent をブロックするため、肯定ケース (現在 eval id 1-4 + id 8 の 5 件) は end-to-end ベンチマーク未実施。否定ケース (eval id 5-7 の 3 件) のみ end-to-end 検証済み。
 - **Phase 9 fan-out cost**: 不具合の多いファイル (fix candidate 5+ × multi-option) では cost-tier table の "+20-80k" を 4-9× 超える可能性 (SKILL.md "Known limitations" 参照)。
 - **外部 target 運用サンプル数 = 1** (`~/.claude/CLAUDE.md`)。それ以外の CLAUDE.md / SKILL.md に対する挙動は未確認。
 

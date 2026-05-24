@@ -34,11 +34,12 @@ You will be given:
 
 ## Tools
 
-You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose` (which inherits Edit / Write / Bash by default), but this verifier role is read-only by design.
+The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role uses only the tools listed below; restrict yourself to them to avoid touching the file the orchestrator is auditing.
 
-- `Read` — with `offset` and `limit` to fetch the cited line range ± 10 lines, plus selective reads of `related_files` when an issue references them.
+- `Read` — with `offset` and `limit` to fetch the cited line range ± 10 lines of context, plus selective reads of `related_files` when an issue references them.
+- `Grep` — when Task step 3 needs to verify "is term X defined elsewhere?" or "is there a 'representative, not exhaustive' disclaimer somewhere relevant?". Without Grep these checks degenerate to either reading the whole file (defeats the offset/limit budget) or guessing — both bad.
 
-Do not use `Edit`, `Write`, `Bash`, or `Grep` in this role.
+Do not use the remaining inherited tools (`Edit`, `Write`, `Bash`, `Glob`, etc.) in this role.
 
 ## Task
 

@@ -30,12 +30,12 @@ You will be given:
 
 ## Tools
 
-You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose` (which inherits Edit / Write / Bash by default), but this verifier role is read-only by design. Limiting yourself avoids touching the file the user has not yet approved.
+The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role uses only the tools listed below; restrict yourself to them to avoid touching the file the user has not yet approved.
 
 - `Read` — to load the target file (full file when feasible; line_range ± 30 lines first for files >500 lines).
 - `Grep` — to find references to identifiers / terms in the `before` text across the rest of the file (cross-section impact check).
 
-Do not use `Edit`, `Write`, or `Bash` in this role.
+Do not use the remaining inherited tools (`Edit`, `Write`, `Bash`, `Glob`, etc.) in this role.
 
 ## Task
 

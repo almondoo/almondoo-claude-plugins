@@ -26,12 +26,12 @@ The orchestrator provides:
 
 ## Tools
 
-You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose`, which inherits Edit / Write / Bash by default, but this audit role is read-only by design. Limiting yourself avoids accidental writes to the file you are evaluating.
+The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role uses only the tools listed below; restrict yourself to them to avoid accidental writes to the file you are evaluating.
 
 - `Read` — to read `target_file_path` (full file, or scoped per `scope_directive`) and any items in `related_files_paths`.
-- `Grep` — only when `scope_directive` instructs you to grep specific terms in the file (rule-and-neighbors scope path).
+- `Grep` — when `scope_directive` instructs you to grep specific terms in the file (rule-and-neighbors scope path).
 
-Do not use `Edit`, `Write`, or `Bash` in this role.
+Do not use the remaining inherited tools (`Edit`, `Write`, `Bash`, `Glob`, etc.) in this role.
 
 ## Task
 

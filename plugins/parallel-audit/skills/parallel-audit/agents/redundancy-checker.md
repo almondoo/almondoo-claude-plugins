@@ -47,9 +47,9 @@ You will be given:
 
 ## Tools
 
-This role does not need any file-system tools — all the text it judges is passed in via `convergent_issues[*].relevant_section_text`, `section_purposes`, and `sibling_skills`. The orchestrator dispatches you as `subagent_type: general-purpose` (which inherits Read / Edit / Write / Bash / Grep / Glob by default); leave them all unused.
+The orchestrator dispatches you as `subagent_type: general-purpose`, which inherits the full default toolset (Read, Grep, Glob, Edit, Write, Bash, etc.). This role does not need any file-system tools — all the text it judges is passed in via `convergent_issues[*].relevant_section_text`, `section_purposes`, and `sibling_skills`. Leave all inherited tools unused.
 
-Do not use `Read`, `Edit`, `Write`, `Bash`, `Grep`, or `Glob` in this role.
+Do not use the inherited tools (`Read`, `Grep`, `Glob`, `Edit`, `Write`, `Bash`, etc.) in this role.
 
 ## Task
 
@@ -75,7 +75,7 @@ Return a markdown table:
 | A | REMOVE | None — "default to writing no comments" + "don't add anything beyond task requires" already covers this entirely (claude-md target) | Delete L31-34 entirely. |
 | B | SIMPLIFY | The line-level granularity definition (whitespace / format / rename don't count as modified) is not in defaults. The "no docstrings" portion is redundant. | Compress to: `- Untouched lines: do not add type annotations to lines you did not semantically modify (whitespace / auto-formatter / rename-only changes do not count as modification).` |
 | C | KEEP | The 7-axis classification for HIGH-severity defects is unique to this skill's audit semantics; no upstream skill specifies this taxonomy (skill-md target). | Refine wording per the original defect (Phase 8 should refine, not delete). |
-| D | KEEP | I am inferring (have not verified against the most recent skill-creator skill) that skill-creator's writing-style guidance does not specifically cover this case. Phase 8 should refine wording; the user may want to explicitly verify against skill-creator before later iterations consider removal. | Refine wording. |
+| D | KEEP | The rule's unique value is plausible but uncited (I am inferring, not verifying, that skill-creator's writing-style guidance does not specifically cover this case). | Refine wording per the original defect. Optional: user can explicitly verify against the most recent skill-creator skill before later iterations consider removal. |
 
 ## Constraints
 

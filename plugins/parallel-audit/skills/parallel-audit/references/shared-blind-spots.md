@@ -31,6 +31,6 @@ Pre-load these as suggested exclusions at Phase 2, regardless of `target_type`. 
 
 Previously the `(N − threshold + 1)` entry was duplicated verbatim across `claude-md-specifics.md` and `skill-md-specifics.md`. Architecturally each target-specifics file needed access to the hint, but byte-identical duplication with no automated sync would let the two copies drift on the next edit. Factoring shared entries to this file plus loading-both at Phase 2 gives Phase 6.5 the same coverage with one canonical source.
 
-The Shared exclusion defaults section and the second Shared known-FP pattern (`subagent_type` values) were factored in by the same logic: both specifics files carried byte-similar text for the `subagent_type` exclusion default and its accompanying FP-pattern row.
+The Shared exclusion defaults section and the second Shared known-FP pattern (`subagent_type` values) were factored in by the same logic: both specifics files carried byte-similar text for the `subagent_type` exclusion default and its accompanying FP-pattern row. At present this is the single shared exclusion default; future factor-outs will join it here as more shared patterns emerge.
 
 If a new shared pattern emerges (e.g., another formula or terminology choice that auditors keep flagging on both target types), add it here rather than in either target-specifics document. Add it to the target-specifics document **only when** the pattern is genuinely target-specific.

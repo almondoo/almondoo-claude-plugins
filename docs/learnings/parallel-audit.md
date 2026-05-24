@@ -4,6 +4,90 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-24 (1.2.4 → 1.2.5 — iter-5 7軸再評価で iter-4 regression を発見 + 大幅 fix)
+
+### 経緯
+
+iter-4 commit 直後に **同じ 7軸 + 3 FP-verifier パターン** で iter-5 を回したところ、iter-4 で適用した fix のうち複数が **新規 bug を導入 / 半端適用** していたことが発覚。具体的には:
+
+- **H6 (Phase 11 overlap pre-check)** が 3 つの新 HIGH を生成: REMOVE/INSERT line-shift propagation 未対応 / 3+ chain grouping 曖昧 / `Apply-as-is` option が safety check を bypass
+- **M7 (agent ## Tools section)** が "general-purpose は Edit/Write/Bash を inherit" と誤記 (実際は Read/Grep/Glob も含む) + false-positive-detector が Grep を禁止したが Task step 3 で必要 → 2 HIGH
+- **L4 (cost framing)** は SKILL.md L408 を fix したが L135 の secondary copy を見落とし → 1 HIGH cross-axis dup
+- **H4/H5 (input validation)** は `threshold > N` と `N < 2` を reject したが `threshold == N` / `max_iterations` 未validation / `N` upper bound 未設定 → 4 finding
+- **M4 (subagent_type renumber)** は両 specifics file 内部で番号整合したが evals.json と SKILL.md L146 の external reference を見落とし → 3 finding
+- **M3 (KEEP_uncertain row rewrite)** は column semantics を muddle → 1 MED
+
+### iter-5 評価結果
+
+| Axis | Findings | HIGH |
+|---|---|---|
+| 1 | 7 | 2 |
+| 2 | 5 | 2 |
+| 3 | 5 | 2 |
+| 4 | 1 | 0 |
+| 5 | 6 | 1 |
+| 6 | 9 | 5 |
+| 7 | 2 | 0 |
+| **計** | **35** | **12** |
+
+### iter-5 FP-recheck
+
+3 FP-verifier ≥2/3 集約: 35/35 REAL (verifier 全員一致で FALSE は 0)、HIGH 9 件確定。Cross-axis dedup により ~8 canonical edit cluster に集約。
+
+### iter-5 fix 適用 (1.2.5 反映)
+
+**HIGH cluster (9 finding → 8 edit):**
+
+| Cluster | 対象 | 内容 |
+|---|---|---|
+| C1 (1.F1 + 3.F4) | SKILL.md L135 | "typically doubles iteration cost" → 1.7×-9× range pointer (iter-4 L408 fix が secondary copy を漏らした分) |
+| C2 (1.F2) | SKILL.md L226 Phase 6 | "stop OR continue with next iteration" → "stops" 単独 (Phase 12 primary stop classification と整合) |
+| C3 (2.N2 + 2.N1) | 4 agent files ## Tools | (a) "inherits Edit/Write/Bash" 誤記 → "inherits the full default toolset (Read/Grep/Glob/Edit/Write/Bash, etc.)" に統一、(b) FP-detector に Grep を allow (Task step 3 で必要)、(c) 4 agent で wording を標準化 |
+| C4 (3.F1) | SKILL.md L146 | "exclusion #5" → "currently item #4 after iter-4's renumber" |
+| C5 (3.F2 + 3.F3 + 4.F1) | evals.json id 1, id 2 + README + SKILL.md | (a) eval id 1 exclusion 列挙: 5 items → 4 + shared-blind-spots 1 (subagent_type factored out)、(b) id 2 exclusion 列挙: 4+5th conditional → 3+4th conditional + shared、(c) README + SKILL.md の "4 should-trigger evals" 表記を "5 should-trigger evals (ids 1-4 + id 8)" + "evals that existed at measurement time" qualifier に更新 (id 8 deep-tier eval が後から追加された事実を反映) |
+| C6 (6.H1+H2+H3 + 1.F3+F4 + 5.F4+F5+F6 + 6.M1+L1) | SKILL.md Phase 11 overlap pre-check 全面書き換え | (a) line-shift propagation 説明追加 (INSERT/REMOVE-class fix が downstream fix の line_range を stale 化する)、(b) transitive grouping algorithm 明示 (例 `{A:L10-15, B:L17-20, C:L22-25}` は ABC 1 group)、(c) bottom-up apply ordering (max line number から先)、(d) per-fix re-Read + Phase 9 re-dispatch on stale `before` text、(e) `Apply-as-is` fast-path 廃止 (safety check bypass)、(f) actor 明示 "The main thread (not a subagent) performs the conflict pre-check"、(g) classifier pre-authorize と sequencing 順序を明示、(h) edge cases (single-fix / all-in-one-group / REMOVE-only) 追加、(i) Tool requirements AskUserQuestion + Read 行に overlap pre-check 用途を追加 |
+| C7 (6.H4 + 6.H5 + 1.F5/6.M3 + 5.F1) | SKILL.md L133 input validation 拡張 | (a) `N` upper bound 9 を追加 (Deep tier 上限)、(b) `threshold == N` を reject (`(N-threshold+1)=1` で single-instance signal)、(c) `max_iterations` validation 追加 (1 ≤ max_iterations ≤ 10)、(d) 非整数 / 負数 / 非数値 reject、(e) re-ask cap 3 回 で audit abort (silent loop 防止) |
+
+**MED bonus**:
+- **C8 (2.N3)**: redundancy-checker.md row D — column semantics 整理 (unique_value 列に downstream-action advice 混入を解消、suggested_action 列に optional verification 注記を移動)
+
+**LOW bonus**:
+- **C9 (3.F5)**: shared-blind-spots.md L34 "Why this file exists" phrasing — "At present this is the single shared exclusion default" 追記で誤読を防止
+
+### NEEDS_HUMAN / 保留 (iter-6+ または永続保留)
+
+iter-5 の verifier ≥2/3 が確定したが iter-5 で適用しなかったもの:
+
+- **axis-2.N4/N5** (LOW) — Tools section text duplication / Tool description in constants — DRY refactor が必要だが multi-agent template 化は重い、見送り
+- **axis-5.F2** (LOW) — overlap pre-check の silent activity (Phase activity announce 系の伝統的な NEEDS_HUMAN cluster と同根)
+- **axis-5.F3** (LOW) — `## Tools` prose constraint は enforcement-by-suggestion (canonical fix は dispatch 時 `tools: [...]` parameter — Agent tool SDK 動作の empirical verification が必要、iter-6+ で別途調査)
+- **axis-6.M2** (LOW) — non-integer/negative/non-numeric input handling — C7 で部分カバー、残りは tier 選択 UI で実質ブロック
+- **axis-6.L2** (LOW) — model_string 文字列 validation — iter-6+
+- **axis-7.F8** (MED) — tools: dispatch parameter (axis-5.F3 と同 cluster、SDK 検証が必要)
+- **axis-7.F9** (LOW) — Tools section drift across 4 agents — C3 で 4 agent を統一したが、wording template 化はせず (drift 再発時に対応)
+
+iter-4 から繰り越した NEEDS_HUMAN 8 件 (1.F5, 2.F4, 4.F3, 5.F1/F2/F5/F7/F8) も継続保留。
+
+### iter-5 で得た最大の meta 教訓
+
+**「fix the fix」サイクルは現実的に必要**:
+- iter-4 で適用した 17 件のうち、複数 (H6 / M7 / L4 / H4+H5 / M4 / M3) が新規 bug や半端適用を残した
+- 後続イテレーションで FP-verifier ≥2/3 集約により客観的に regression を発見できた
+- 「修正物がなくなるまで反復」の判定は、iteration 単位の `0 fix candidates from Phase 6` 到達ではなく、cross-iteration での **新規 finding rate が asymptote** か **全 HIGH が NEEDS_HUMAN 化** したかで判定すべき
+- iter-5 で applied 9 fix → iter-6 で regression を検証する必要
+
+**Edit-from-bottom pattern は標準化価値あり**:
+- C6 で導入した bottom-up ordering は H6 の line-shift propagation 問題を構造的に解決
+- 他の skill / plugin の multi-fix workflow にも横展開可能 (例 `pr-review-toolkit:code-reviewer`)
+
+**Pre-edit grep sweep pattern**:
+- verifier #2 が指摘した「primary location fix → secondary site forgotten」pattern (M4 / L4 等) は、fix 適用前に grep で同一識別子 / 同一 phase 番号 / 同一 multiplier 出現箇所を全部洗い出して同 commit で fix する規律が必要
+- iter-6+ で M3-style "primary site のみ fix" を再発防止するための pitfalls.md entry が候補
+
+### 残作業
+
+iter-5 後の状態に対し iter-6 を回し、(a) iter-5 修正の regression 検出 (b) 残存 NEEDS_HUMAN/LOW の再 surface (c) 新規 finding rate が asymptote に到達したか判定。
+
 ## 2026-05-24 (1.2.3 → 1.2.4 — iter-4 7軸多角評価 + 3 FP-verifier ≥2/3 集約)
 
 ### 経緯
