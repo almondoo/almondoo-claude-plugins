@@ -43,6 +43,41 @@
         "instruction-file",
         "diagnostic"
       ]
+    },
+    {
+      "name": "reviewing-dependency-updates",
+      "description": "Security-first review checklist for dependency update PRs from Dependabot, Renovate, or manual bumps. Walks a three-phase decision flow — Phase 1 basic verification (CI matrix, mergeability, version-jump class), Phase 2 security verification (GitHub Security Advisory, package trust signals, transitive-dependency churn, SHA pinning for Actions), Phase 3 change-impact (breaking changes, language-version requirements vs. CI matrix, lockfile consistency) — then classifies each PR as merge / caution / do-not-merge and proposes a recommended action. Never auto-executes the merge; always requires explicit user approval.",
+      "source": "./plugins/reviewing-dependency-updates",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": [
+        "dependency-updates",
+        "dependabot",
+        "renovate",
+        "security",
+        "supply-chain",
+        "pr-review",
+        "gh"
+      ]
+    },
+    {
+      "name": "agent-teams",
+      "description": "Spawn a Lead + Implementer + Reviewer + Tester (+ optional dedicated Security Checker) team and drive multi-task work in Waves with built-in quality gates. The Lead is the only role allowed to execute destructive git operations, and only `git add` (per-path) and `git commit` (no amend) — every other destructive operation (reset / restore / push / rebase / merge / revert / cherry-pick / --amend / branch -D / clean / stash drop / worktree remove) is forbidden even for the Lead, eliminating shared-workspace race conditions by construction. All teammates are spawned in a single Phase 2 batch; the Tester is requested exactly once at the end of each wave (per-commit verification requests are forbidden). The skill is manually invoked via `/agent-teams <task description>` (automatic invocation is disabled). Includes spawn-prompt templates, a wave-composition template, a Lead checklist, and references for git permissions, Implementer pitfalls (literal control bytes), and Tester request consolidation.",
+      "source": "./plugins/agent-teams",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": [
+        "agent-teams",
+        "parallel",
+        "multi-agent",
+        "team-orchestration",
+        "code-review",
+        "security-review",
+        "test-regression",
+        "git-discipline",
+        "wave-based",
+        "quality-gate"
+      ]
     }
   ]
 }

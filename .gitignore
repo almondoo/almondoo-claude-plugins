@@ -11,9 +11,6 @@
 tmp/
 .worktrees/
 
-# skill-creator iteration workspaces (per-skill evaluation artifacts: benchmark.json, static-review.md, etc.)
-**/skills/*-workspace/
-
 # Personal Claude Code instructions / settings (not shared)
 CLAUDE.local.md
 .claude/settings.local.json

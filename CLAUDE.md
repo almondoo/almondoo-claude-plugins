@@ -8,6 +8,14 @@ Claude Code plugin marketplace (`almondoo-claude-plugins`).
 - The `name:` in each SKILL.md frontmatter must match the directory basename.
 - Per-plugin design decisions, iteration history, and operational gotchas are accumulated in `docs/learnings/<name>.md` at the repo root — outside `plugins/` so installed plugins do not carry maintainer-side history.
 
+### Runtime workspaces — never under `plugins/`
+
+When a plugin needs a scratch directory at execution time (iteration logs, eval artifacts, `static.json` outputs, etc.), it MUST write under the project root's `tmp/` — e.g. `tmp/<plugin>-workspace/iteration-N/`. `tmp/` is already gitignored, so the artifacts stay out of the published plugin AND out of git history.
+
+Do **not** write workspaces under `plugins/<name>/skills/` — past incident: `plugins/parallel-audit/skills/parallel-audit-workspace/` accumulated 72 files containing absolute `/Users/tm/...` paths that would have shipped via `/plugin install`. The earlier `**/skills/*-workspace/` gitignore line masked this in git status but did not stop `/plugin install` from distributing the directory.
+
+Also do not write to OS `/tmp` — see the user-level CLAUDE.md `## Temporary Files` rule (sandbox isolation / mid-task cleanup risk).
+
 ## Version bump
 
 - Run `./.claude/skills/bump-plugin-version/scripts/bump.sh <plugin> <semver>` to keep `marketplace.json` and `plugin.json` in sync.
