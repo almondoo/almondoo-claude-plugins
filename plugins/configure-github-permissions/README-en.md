@@ -52,6 +52,20 @@ It also activates from natural language. The skill matches when the user asks *"
 
 The write target is **fixed to the project's `.claude/settings.local.json`**. The committed `.claude/settings.json` and the user-global `~/.claude/settings.json` are deliberately out of scope — team-wide gh policy must be hand-placed elsewhere.
 
+## When project-local override is actually worth it
+
+Even when your `~/.claude/settings.json` already encodes a sensible default gh policy, per-project overrides are sometimes the right move:
+
+- **Public OSS repo**: global has `gh issue close` at `ask`, but subscriber-notification blast is high — tighten this one repo to `deny`.
+- **CI-heavy monorepo**: global denies `gh workflow run` by default; on an internal tooling repo, loosen it to `ask` so manual re-runs are possible.
+- **Personal sandbox repo**: global denies `gh release create`, but on a private experimentation repo you want `allow`.
+
+Conversely, if your global config already covers your usage and per-project override is unnecessary, running this skill mostly produces 0-addition runs — see `When NOT to Use` in the SKILL body.
+
+### Pattern notation (colon vs space)
+
+This skill writes patterns in the `Bash(gh xxx:*)` colon form. Global settings typically use the `Bash(gh xxx *)` space form. Per Claude Code's permission spec, **both forms match the same argv** and are interchangeable. Mixing them inside one `settings.local.json` is harmless. If you want one consistent style for grep / diff readability, hand-align to match your existing file — the skill tolerates both and de-duplicates across notations.
+
 ## Before running
 
 - **Want to keep your existing `.claude/settings.local.json`?** Back it up first: `cp .claude/settings.local.json .claude/settings.local.json.bak`. The skill itself is idempotent (a second run is a no-op), but Step 5 (conflict resolution) is the one place where an existing entry can be moved between arrays — and "moved" means "removed from the source array".
@@ -68,6 +82,8 @@ configure-github-permissions/
 │       └── SKILL.md
 └── README.md
 ```
+
+The absence of `scripts/` / `references/` / `agents/` is deliberate. The merge / dedupe / conflict-detection logic is small enough to stay inside SKILL.md, and pulling it into a separate script would force users to trust an additional bundled artifact for a one-shot operation (see "Why this design" in SKILL.md). If we ever extend the skill to handle `~/.claude/settings.json` or multi-tool patterns, that's the right moment to factor a script out.
 
 ## Design notes
 

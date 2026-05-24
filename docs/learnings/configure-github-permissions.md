@@ -51,6 +51,32 @@
 
 - v0.1.1 → v0.1.2 (Cat 5 Tier 3 誤記訂正 + Cat 11 追加 + Step 5/6/7 安全強化 + meta 整合)。
 
+## 2026-05-24 (README + rationale compression v0.1.4 → v0.1.5)
+
+イテレーション5。0.1.4 で繰越にした項目のうち、README 改修と Cat 弁明文圧縮の 5 件を実装。
+
+### README 改修
+
+- **README ja/en に "いつ project-local で override したくなるか" 節を新設** (敵対 P0a 緩和版): OSS repo / CI monorepo / 個人 sandbox の 3 シナリオを明示。敵対的レビューが「skill ごと存在意義なし」と主張した最強の批判への部分的回答。「global と完全に同じ」なら no-op で終わる + override の現実例が示せた以上、skill の価値命題は守れた判断。
+- **README ja/en に "パターン記法 (colon vs space)" 注記を追加** (敵対 P1b): skill の colon 形式と global の space 形式が等価であることを公式仕様引用付きで明示。混在しても動作差なし、grep 用に手で揃えてよい、という運用上の指針。
+- **README ja/en の "Layout" 節に scripts なし構成の意図を 1 行追記** (構造 #5): SKILL.md の "Why this design" 節への参照リンクを README からも貼り、parallel-audit 比で「軽量に見える」誤認を防止。
+
+### SKILL.md 圧縮
+
+- **Cat 5 弁明文を 4 文→2 文に圧縮** (敵対 P2b): 「Tier 2 の説明 + reversible なので default ask + OSS で deny に締める override 例 + reopen を pair」を 2 文で言い切る形に。why は残しつつ冗長な敬語的補足を削除。
+- **Cat 10 弁明文を 4 段落→2 段落に圧縮** (敵対 P2b): flag combo 列挙 + 公式 warning 引用 + GET-only ユースケース + path-scoped allow rule の 4 セクションを、それぞれ 1 文ずつにまとめて 2 段落に圧縮。`{owner}/{repo}` 警告も保持。
+
+### 見送り判断 (今回適用しなかった項目)
+
+- **"11 categories" literal 集約** (構造 #4): SKILL.md 内に 7 箇所あるが、frontmatter / Overview / "When NOT to Use" は数字が読み手の検索性・直感に寄与しており「the categories above」型の指示語に置換すると逆に読みにくくなる。cat 追加時の touch ファイル数を減らす利得 (せいぜい 3-4 箇所減) に対して読みやすさの劣化コストが見合わない。Cat 追加が現実に近づいた時点で再評価する。
+- **preset shortcut (Conservative/Balanced/Aggressive)**: 構造インパクトが大きく単独 patch にすべき。Step 2.5 と統合する形で 0.1.6 以降で検討。
+- **global diff mode** (~/.claude/settings.json を読んで effective に同じ entry を skip): merge semantics 再現は実装複雑。0.1.6 以降で検討。
+- **evals/evals.json 追加** (構造 #3): trigger 競合の eval は skill-creator の専門領域に踏み込むため、別ワークフローで実施。
+
+### バージョン経緯
+
+- v0.1.4 → v0.1.5 (README 3 節改修 + Cat 5/10 圧縮 = 計 5 件)。
+
 ## 2026-05-24 (UX/structural deepening v0.1.3 → v0.1.4)
 
 イテレーション4 (UXシミュ + 敵対的レビュー + 構造/スケール の 3 視点) で 8 件の修正項目に絞り込み実施。

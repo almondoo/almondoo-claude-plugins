@@ -96,7 +96,7 @@ Bash(gh issue close:*)
 Bash(gh issue reopen:*)
 ```
 
-`gh issue close` does fire external notifications (subscribers, Slack integrations, GitHub Actions triggers), but the action itself is reversible via `gh issue reopen`, so it sits in the global CLAUDE.md **Tier 2** band (locally-destructive / new external creation) rather than Tier 3. The default is `ask` so that the user can eyeball the issue number and the timing before sending the close. Repositories with a stricter policy — for example, public-facing issue trackers where even a transient close ping is high-cost — can override this to `deny` via their CLAUDE.md or by re-running this skill and choosing `deny`. `reopen` is benign on its own, but pairing it with `close` keeps the operational policy simple.
+Reversible via `gh issue reopen`, so Tier 2 in global CLAUDE.md (not Tier 3). Default `ask` lets the user eyeball the issue number before sending. Tighten to `deny` on public OSS repos where even a transient close ping is high-cost. `reopen` is grouped with `close` to keep the policy simple.
 
 ### Cat 6 — PR create / edit: PR creation and editing (recommended: ask)
 
@@ -145,16 +145,9 @@ Re-running, canceling, or toggling CI workflows has large side effects (CI minut
 Bash(gh api:*)
 ```
 
-`gh api` switches HTTP methods via the `-X` flag and data flags (`-f` / `-F` / `--input`), so Bash permission argument-pattern matching cannot reliably isolate the method or its destructiveness. The official Claude Code documentation (`code.claude.com/docs/en/permissions`) also states **"Bash permission patterns that try to constrain command arguments are fragile"**. Bypass paths are numerous: flag reordering (`gh api foo -X DELETE` ⇄ `gh api -X DELETE foo`), the `=` form `--method=DELETE`, automatic POST promotion when `-f` is added, body submission via `--input file`, etc.
+`gh api` switches HTTP methods via flag combos (`-X DELETE`, `--method=DELETE`, auto-POST when `-f` is added, body via `--input file`) and flag order is flexible, so Bash permission arg-pattern matching cannot reliably isolate the method — see the official "Bash permission patterns that try to constrain command arguments are fragile" warning at `code.claude.com/docs/en/permissions`. A blanket `deny` would also block legitimate GET-only uses that only `gh api` can serve (PR review inline comments via `repos/{owner}/{repo}/pulls/{N}/comments`, custom properties, reaction breakdowns). Default `ask` with the expectation that the user eyeballs endpoint + method per invocation.
 
-That said, there are legitimate GET-only use cases that **only** `gh api` can cover. Representative examples:
-
-- **PR review comments (inline comments on specific diff lines)**: `gh pr view` cannot fully retrieve them; `gh api repos/{owner}/{repo}/pulls/{N}/comments` is required.
-- Specific metadata (custom properties, triage status, issue reaction breakdowns).
-
-Therefore a blanket `deny` would stop everyday read tasks like PR review tracking and issue metadata retrieval. The default is **`ask`**, with the operational expectation that the user visually verifies the endpoint and method at invocation time.
-
-If `ask` becomes noisy, the recommended approach is to add **path-scoped allow rules for specific GET endpoints** the user hits frequently (e.g. `Bash(gh api repos/*/pulls/*/comments)`). The skill cannot ship such rules as defaults; the user adds them manually. Note that the placeholder syntax must use plain glob `*`, not `{owner}` / `{repo}` literals — the official permissions docs at `code.claude.com/docs/en/permissions` only specify `*` as the wildcard; curly-brace placeholders are outside the spec, so they are matched as literal characters and never line up with real argv like `octocat/Hello-World`.
+If `ask` becomes noisy, add **path-scoped allow rules** for the GET endpoints you hit often, e.g. `Bash(gh api repos/*/pulls/*/comments)`. Use plain glob `*`, **not** `{owner}` / `{repo}` literals — the permissions spec only defines `*` as a wildcard; curly-brace placeholders fall outside the spec and would be matched literally against argv like `octocat/Hello-World`.
 
 ### Cat 11 — Delete-class: Repository / Issue / Run / Cache / Secret / Variable deletions (recommended: deny)
 
