@@ -1,7 +1,7 @@
 {
   "name": "configure-github-permissions",
-  "description": "Interactively configure GitHub CLI (gh) permissions in the project-local .claude/settings.local.json (not the committed .claude/settings.json) by asking the user category-by-category (11 categories × 3 choices: allow / ask / deny) which gh operation groups should be auto-allowed, prompt-on-use, or auto-denied. Destructive categories (merge, release, workflow exec, gh api, delete-class) default to deny. Preserves existing entries, dedupes additions, and surfaces cross-array conflicts before writing.",
-  "version": "1.0.0",
+  "description": "Interactively configure GitHub CLI (gh, including gh api) AND git command permissions in the project-local .claude/settings.local.json (not the committed .claude/settings.json) by asking the user category-by-category (17 categories × 3 choices: allow / ask / deny) which gh / git operation groups should be auto-allowed, prompt-on-use, or auto-denied. Destructive categories (gh merge, release, workflow exec, gh api, delete-class; git push, git reset --hard / restore / branch -D / clean -fd / stash drop) default to deny. git uses broad-allow + narrow-deny so safe sub-uses auto-execute while destructive ones stay blocked under the deny→ask→allow first-match-wins rule. Preserves existing entries, dedupes additions, and surfaces cross-array conflicts before writing.",
+  "version": "1.1.0",
   "author": {
     "name": "almondoo"
   },
@@ -11,6 +11,7 @@
   "keywords": [
     "gh",
     "github-cli",
+    "git",
     "permissions",
     "settings",
     "allowlist",

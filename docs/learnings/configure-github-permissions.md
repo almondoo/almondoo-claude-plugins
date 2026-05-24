@@ -2,6 +2,43 @@
 
 各セッションで得た知見を新しい順に記録。
 
+## 2026-05-24 (git カテゴリ追加 + gh api 設計検証 v1.0.0 → v1.1.0)
+
+### 設計分岐の確定
+
+- **スキル名は据え置き** (`configure-github-permissions`)。git も対象になるが、リネームは plugin name / directory / slash command まで波及する一方、description / README で git を明示すれば triggering は十分カバーできる。互換性影響ゼロを優先。
+- **git は 6 カテゴリで分割**: Cat 12 read-only (allow), Cat 13 local writes (allow), Cat 14 history rewrite (ask), Cat 15 tag (ask), Cat 16 destructive local (deny), Cat 17 push (deny)。粗粒度 3 カテゴリ案 / 細粒度 8 カテゴリ案も検討したが、6 が「質問数が gh 11 + git 6 = 17 で `⌈N/4⌉ = 5 batches` に綺麗に収まる」「ユーザーの global CLAUDE.md の Tier 分類とほぼ 1:1 で対応する」のバランスポイント。
+- **`gh api` は据え置き** (`Bash(gh api:*)` 1 行 ask)。当初は「path-scoped allow + catch-all ask の 2 分割」を提案したが、**公式仕様検証で重大な前提誤り** を発見 (次項)。
+
+### 公式仕様の検証で訂正した前提誤り
+
+- **「allow が deny precedence で勝つので catch-all ask + path-scoped allow が共存可能」は誤り**。`code.claude.com/docs/en/permissions` 本文は明確に「Rules are evaluated in order: deny → ask → allow. The first matching rule wins」と書いており、`ask` tier が先に check されるため catch-all `Bash(gh api:*)` を ask に入れた状態では path-scoped `Bash(gh api repos/*/pulls/*/comments:*)` を allow に入れても **ask が先に当たって allow は実質的に死ぬ**。
+- **教訓**: 設計選択肢を立てる時、tier 評価順 / first-match semantics のような仕様根拠は **その場で公式 docs を fetch して確認** する。memory ベースの「たぶんこう」で選択肢を作るとユーザーに誤った前提を選ばせてしまう。WebFetch で `code.claude.com/docs/en/permissions` を引いてから選択肢を作り直し、ユーザーに「公式仕様を踏まえて再選択」を要請する形でリカバリ。
+- **git の broad-allow + narrow-deny パターンは逆に first-match-wins のおかげで正しく動く**。`Bash(git branch:*)` を allow に入れつつ `Bash(git branch -D:*)` を deny に入れると、deny tier が先に当たって `git branch -D foo` は deny される。これはユーザーの global `~/.claude/settings.json` で既に取られている構造で、project-local も同パターンに揃えた。
+
+### 設計判断
+
+- **broad-allow + narrow-deny を git 限定で導入**。gh 側は verb 単位で破壊性が明確に切り分かる (e.g. `gh pr view` と `gh pr merge`) のでこのパターン不要だが、git は同 verb の sub-form (`git branch` vs `git branch -D`、`git reset --soft` vs `git reset --hard`、`git stash push` vs `git stash drop`) で破壊性が変わるため、broad-allow + narrow-deny の構造でしか「便利な使い方は allow、破壊的形は deny」を表現できない。
+- **`git config` 全面は allow に入れない**。`git config user.email evil@...` のような silent な書き換えは現在のセッションのみならず以降の全 commit に影響する。Cat 12 では `git config --get` / `--list` だけ読み出し系として allow に入れ、set 系は default mode の prompt に委ねる。
+- **`git tag` は単独カテゴリ (Cat 15)**。本来 tag create は local mutation で Cat 13 に同居でも論理上は OK だが、`git push --tags` で公開する直前のアクションになることが多いので、ユーザーに per-invocation で確認させる ask default を推奨。tag の delete も含めて単一 broad pattern `Bash(git tag:*)` で扱う。
+- **`git push` は単一 broad pattern `Bash(git push:*)`** で全形 (force / tags / delete) を deny。global と同じ姿勢。
+
+### option description で安全網を明示
+
+- Cat 16 / 17 の `deny` option description は **不可逆性を直接書く** (例: `Block git push — pushed history is the moment local mistakes become public`)。「destructive と書いてあるカテゴリだから deny だろう」と推測させない。
+- Cat 12 / 13 の `allow` option description は **Cat 16 deny が paired で効いていることを明示**。ユーザーが「Cat 12 allow を選ぶと `git branch -D` も auto-execute される」と誤解しないよう、SKILL Step 3 解説に必須化。
+
+### 派生変更
+
+- Step 3 batch を `⌈N/4⌉` で再導出 (17 → 5 batches: 4+4+4+4+1)。Step 3 本文の batch 例も全件書き直し。
+- description / Overview / Default selection logic / Edge cases / Why this design すべてで `gh` 単独表現を `gh / git` または `gh ... and git ...` に書き換え。
+- plugin.json / marketplace.json の description と keywords に `git` を追加。`git` keyword は marketplace 検索で「git permissions」「git allowlist」を引いた時にヒットさせる。
+- README ja/en で git カテゴリ 6 件を表に追加、broad-allow + narrow-deny の説明 + gh api catch-all シャドウイングの注意を「設計メモ / Design notes」に追加。
+
+### バージョン経緯
+
+- v1.0.0 → v1.1.0 (git 6 カテゴリ追加 + gh api 設計検証で据え置き判断 + 公式仕様引用強化)。
+
 ## 2026-05-24 (multi-angle audit + meta-verify v0.1.1 → v0.1.2)
 
 ### 事実誤認の修正

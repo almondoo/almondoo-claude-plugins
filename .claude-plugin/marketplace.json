@@ -11,13 +11,14 @@
   "plugins": [
     {
       "name": "configure-github-permissions",
-      "description": "Interactively configure GitHub CLI (gh) permissions in the project-local .claude/settings.local.json via 11 categories × 3 choices (allow / ask / deny). Destructive categories (merge, release, workflow exec, gh api, delete-class) default to deny.",
+      "description": "Interactively configure GitHub CLI (gh, including gh api) AND git command permissions in the project-local .claude/settings.local.json via 17 categories × 3 choices (allow / ask / deny). Destructive categories (gh merge / release / workflow exec / gh api / delete-class; git push / reset --hard / restore / branch -D / clean -fd / stash drop) default to deny. git uses broad-allow + narrow-deny to keep safe sub-uses friction-free while blocking destructive ones via the deny→ask→allow first-match-wins rule.",
       "source": "./plugins/configure-github-permissions",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "category": "productivity",
       "keywords": [
         "gh",
         "github-cli",
+        "git",
         "permissions",
         "settings",
         "allowlist",
