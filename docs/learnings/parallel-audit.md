@@ -4,6 +4,113 @@
 
 このファイルは `claude-md-parallel-audit` (cmpa) と `skill-md-parallel-audit` (smpa) を統合した `parallel-audit` plugin の learnings log。旧 2 ファイル (`docs/learnings/claude-md-parallel-audit.md`, `docs/learnings/skill-md-parallel-audit.md`) の歴史は本ファイル末尾に時系列で保存している。旧 plugin が marketplace から削除されるタイミングで旧 learnings ファイルも削除予定。
 
+## 2026-05-24 (1.2.3 → 1.2.4 — iter-4 7軸多角評価 + 3 FP-verifier ≥2/3 集約)
+
+### 経緯
+
+ユーザー再度 `/skill-creator` 経由で「parallel-audit を多角評価 → 修正 → patch bump → 繰り返し (修正物がなくなるまで)」をリクエスト。前回 (1.2.2 → 1.2.3) は 3 reviewer 並列の収束で「1 ラウンド」だったが、本セッションは **7 軸並列評価 + 3 FP-verifier ≥2/3 aggregate** という新パターンで iter-4 を実施。
+
+### iter-4 評価フェーズ
+
+7 軸並列 evaluator dispatch:
+
+| Axis | 観点 | Findings | HIGH |
+|---|---|---|---|
+| 1 | SKILL.md quality | 10 | 2 |
+| 2 | agents/*.md prompts | 8 | 2 |
+| 3 | references/*.md | 5 | 0 |
+| 4 | README + JSON consistency | 3 | 0 |
+| 5 | UX & workflow | 11 | 3 |
+| 6 | edge cases & failure modes | 10 | 3 |
+| 7 | security & Tier compliance | 7 | 0 |
+| **計** | | **54** | **10** |
+
+### iter-4 FP-recheck フェーズ
+
+3 FP-verifier 並列 → ≥2/3 で REAL/FALSE/NEEDS_HUMAN 確定。
+
+| 分類 | 件数 | 内訳 |
+|---|---|---|
+| REAL (≥2/3) | 43 | HIGH 6, MED 15, LOW 22 |
+| FALSE (≥2/3) | 3 | 1.F9, 3.F5, 7.F7 (いずれも axis evaluator 自身が non-finding に self-demote) |
+| NEEDS_HUMAN (≥2/3) | 8 | UX 設計判断系 (5.F1/F2/F5/F7/F8) + 履歴系 (4.F3) + 自己充足性設計 (2.F4) + ship-ready scope (1.F5) |
+
+**HIGH 6件** (全 verifier 一致): axis-1.F1 (model literal hardcode), axis-2.F1 (FP-detector Phase 5 ref), axis-2.F2 (auditor Phase 5 ref), axis-6.F1 (`threshold > N` silent stop), axis-6.F2 (`N=1` silent convergence-off), axis-6.F3 (cross-fix overlap not detected).
+
+### iter-4 fix 適用 (1.2.4 反映)
+
+iter-4 適用範囲: **HIGH 6 全件 + 手術的 MED 7 + 1-liner LOW 4** = 17 fix。NEEDS_HUMAN 8 件と scope の重い MED/LOW は iter-5+ または保留。
+
+#### HIGH (6 件)
+
+| Fix | 対象 | 内容 |
+|---|---|---|
+| H1 (1.F1) | SKILL.md L171 | `model: "sonnet"` literal → `model: <model_string>` ── L173 の override path と整合、`model_string` user override が silently dead だった bug を解消 |
+| H2 (2.F1) | false-positive-detector.md L16/L61/L69 | "Phase 5 for fix proposal" / "Phase 5's job" を Phase 7 → 8 へ修正。同 file 内に 3 箇所の stale ref |
+| H3 (2.F2) | auditor.md L84 | "Phase 5 of the workflow drafts fixes" → Phase 8 |
+| H4 (6.F1) | SKILL.md Phase 2 step 3 | `threshold > N` を Phase 2 で reject (silent vacuous pass を防止) |
+| H5 (6.F2) | SKILL.md Phase 2 step 3 + parameter table | `N < 2` reject + `N` パラメータ説明にも明記 |
+| H6 (6.F3) | SKILL.md Phase 11 新節 "Pre-check for overlapping fix line ranges" | line_range が ±2 行で重なる fix を group 化 → 順次 apply + 重複確認 |
+
+#### MED (7 件)
+
+| Fix | 対象 | 内容 |
+|---|---|---|
+| M1 (1.F2) | SKILL.md L88 + L173 | Phase 9 を "single-agent evaluation" と誤記していた rationale を fan-out 構造に合わせて再記述 |
+| M2 (1.F6) | SKILL.md L391 (Tool requirements Glob row) | Phase 2 にない "SKILL.md candidate discovery" 機能の dangling claim を削除 |
+| M3 (2.F3) | redundancy-checker.md L72 | 例 row の `KEEP (uncertain)` を `KEEP` + 不確実性を prose に移行 (declared enum との producer-consumer 整合) |
+| M4 (3.F1+F2) | shared-blind-spots.md / claude-md-specifics.md / skill-md-specifics.md | `subagent_type` exclusion default + 対応 FP-pattern row を shared-blind-spots.md に factor out。両 specifics file の duplicate を pointer 化、exclusion 番号を 1-4 に詰め直し、FP-pattern row の番号参照も整合 |
+| M5 (3.F3) | shared-blind-spots.md 全面書き換え | L17 "Phase 6.5 reads only the target-relevant specifics" を "orchestrator reads files; Phase 6.5 receives pre-built `known_fp_patterns`" に修正。新節 "Shared exclusion defaults" + 拡張 "Shared known-FP patterns" 構造 |
+| M6 (4.F1) | README.md L29 + README-en.md L29 | Phase 11 description を reactive ("拒否されたら認可を得て retry") → pre-authorize first + reactive fallback に align |
+| M7 (7.F2) | 4 agent files | 各 agent prompt に `## Tools` 節を追加。`general-purpose` dispatch で inherit する Edit/Write/Bash を prose constraint で role 別に絞る (read-only 役 / data-only 役) |
+
+#### LOW (4 件)
+
+| Fix | 対象 | 内容 |
+|---|---|---|
+| L1 (1.F3) | SKILL.md L74 threshold row | "(≥2/3 ≈ 67%)" の hardcoded 文言を削除し、`2 ≤ threshold ≤ N` 制約 + tier 依存の percentage を明記 |
+| L3 (2.F8) | auditor.md L77 | `**NO HIGH ISSUES**` bold form → `NO HIGH ISSUES` (SKILL.md L319 stop-condition 表記と lexical 整合) |
+| L4 (3.F4) | ab-testing.md L26 + SKILL.md L408 | "roughly doubles" 単一表現 → 1.7×-9× range (own cost table と整合) |
+| L5 (4.F2) | README.md L27 + README-en.md L27 | "Phase 6 / 7" → "Phase 6 / 6.5 / 7" (false-positive-detector phase number を hide していた) |
+
+### NEEDS_HUMAN 保留分 (8 件)
+
+iter-5+ で user 判断を仰ぐか、scope 外として確定保留:
+
+- **axis-1.F5** — Phase 12 "both layers clean" を plateau/max_iter/0-fix 経路にも extend するか (report verbosity policy 判断)
+- **axis-2.F4** — agent prompt に `## Tools` 節を **frontmatter `allowed-tools:` で gating するか prose で済ますか** (M7 は prose 採用。frontmatter 化は別判断)
+- **axis-4.F3** — README "max_iterations 5 → 3" の predecessor default が historical fact として正しいか (旧 plugin source を確認しない限り未検証)
+- **axis-5.F1** — Pre-audit modal 数 (4-6 件) の compress 是非
+- **axis-5.F2** — Phase 0 pre-flight cost/time estimate 導入是非
+- **axis-5.F5** — Phase resume 機能の new-feature 判断
+- **axis-5.F7** — Trigger description に自然な phrasing を増やすか (over-triggering risk)
+- **axis-5.F8** — Phase 10 batch-approve escape hatch (intentional anti-rubber-stamping vs friction trade-off)
+
+### iter-4 で深堀りされた残課題 (iter-5+ 候補)
+
+verifier が REAL 認定したが scope/重さで本 iter から外したもの:
+
+- **axis-1.F4** (MED) — Phase 11.5(b) を 0-fix 適用時に skip する precondition 追加
+- **axis-1.F7** (MED) — Phase 3 section_purposes re-pass の diff-based auto-detect trigger
+- **axis-5.F3** (MED) — global abort path 文書化
+- **axis-5.F4** (MED) — Phase 6.5/7/9 subagent failure の user-surfacing
+- **axis-6.F4** (MED) — below-threshold persistent (r2-F1 watch pattern) の escalation policy 明文化
+- **axis-6.F5** (MED) — file-size guardrail (>2000 行で warning)
+- **axis-6.F6** (MED) — per-fix post-Edit verification (Phase 11.5(a) whole-file re-audit で部分カバー済み)
+- **axis-6.F7** (MED) — clustering algorithm 明文化 (N=9 × 10 = 90 findings の manual cluster fragility)
+- 残り LOW (1.F8/F10, 2.F5/F6/F7, 5.F6/F9-F11, 6.F8-F10, 7.F1/F3/F4/F5/F6) — 個別判断
+
+### iter-4 で得た meta 教訓
+
+- **7軸 evaluator パターンが workable**: 3 reviewer (前回) より 7 axis-specialized evaluator の方が "what to look for" が axis ごとに明確で findings 漏れが減る。特に edge-cases (axis-6) が input validation 系の HIGH 3件を新規発見 (`threshold > N` / `N=1` / cross-fix overlap)。3 reviewer × generic prompt では拾えない可能性が高かった
+- **3 FP-verifier ≥2/3 集約は severity 調整に有効**: axis evaluator の overweighted HIGH (axis-1.F2 / axis-5.F2/F3) を MED/MED/MED に系統的に降格。3 verifier 全員が独立に同じ severity に着地 → noise 低減
+- **Phase 5 stale ref の cluster fix**: agent file 横断 (false-positive-detector × 3箇所 + auditor × 1箇所) で同根 defect が発見。phase 番号 rename pass が agent prompt まで届いていなかった (iter-3 まで誰も気付かず)
+- **input validation gap が systemic**: SKILL.md は workflow 中身は手厚いが、Phase 2 input validation が後付けで `N=1` / `threshold > N` を silently 受け入れていた。Phase 2 で defensive validation を入れる pattern を確立
+
+### 残作業
+
+iter-4 修正後の状態に対し iter-5 で同サイクル (7軸再評価 → ≥2/3 集約) を回し、**修正物が 0 になるか asymptote** で stop。
+
 ## 2026-05-24 (1.2.2 → 1.2.3 — 多角評価 + FP-recheck + rolling static review 収束)
 
 ### 経緯

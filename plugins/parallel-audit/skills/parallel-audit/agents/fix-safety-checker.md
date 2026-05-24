@@ -28,6 +28,15 @@ You will be given:
    ```
 4. **`section_purposes`** — map from each section heading to its 1-line purpose, established in Phase 3 with user confirmation. Use this as the **authoritative baseline** for the `intent_preserved` check — do not re-derive section intent from the file content (that would be circular reasoning that re-reads the section being changed).
 
+## Tools
+
+You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose` (which inherits Edit / Write / Bash by default), but this verifier role is read-only by design. Limiting yourself avoids touching the file the user has not yet approved.
+
+- `Read` — to load the target file (full file when feasible; line_range ± 30 lines first for files >500 lines).
+- `Grep` — to find references to identifiers / terms in the `before` text across the rest of the file (cross-section impact check).
+
+Do not use `Edit`, `Write`, or `Bash` in this role.
+
 ## Task
 
 1. **Read the target file in full.** This is essential — you need to see all the places that may reference the changed text. (For files >500 lines, read the immediate context (line_range ± 30 lines) first, then grep for terms that appear in the changed text to find other references.)

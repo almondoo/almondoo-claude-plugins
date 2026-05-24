@@ -6,11 +6,12 @@ Target-type-specific reference for `target_type == "skill-md"`. Loaded by the ma
 
 Pre-load these as suggested exclusions at Phase 2. The user can deselect any that don't apply.
 
-1. **Claude Code official `subagent_type` values** — `general-purpose`, `Explore`, `Plan`, `claude`, and plugin-namespaced types like `feature-dev:code-architect`. Auditors that lack the user's harness context will flag these as "undefined". Match against the list in the user's `~/.claude/CLAUDE.md` or the system-prompt agent-types list.
-2. **Placeholder conventions** — any `<placeholder>` token inside a path template, command shape, formula, or example is a runtime substitution by the executor (e.g., `<workspace>`, `<marketplace_root>`, `<name>`, `<plugin>`, `<marketplace>` in path globs; `<N>`, `<threshold>` in formulas). These are NOT undefined terms — they are template parameters that the calling phase replaces with concrete values.
-3. **Cross-skill references that the SKILL.md author intentionally leaves as informational pointers** — e.g. "see skill-creator's references/schemas.md" where the load-bearing content is also inlined. Distinguish "broken reference" (REAL defect, no resolution path) from "informational pointer" (intentional courtesy).
-4. **Frontmatter content** — `description` length, trigger phrasing, etc. are owned by `skill-eval`'s static axes; do not re-flag here.
-5. **(Conditional) Structural defects covered by skill-eval `static_check`** — only added when Phase 2.5 successfully ran and produced a `static.json`. Append this exclusion to the list **before Phase 4 dispatches**, with this literal text:
+For the **Claude Code official `subagent_type` values** exclusion (previously item 1 here), see `references/shared-blind-spots.md` — it now lives there as a shared exclusion default because both target types need it. The orchestrator merges it into the pre-loaded list at Phase 2.
+
+1. **Placeholder conventions** — any `<placeholder>` token inside a path template, command shape, formula, or example is a runtime substitution by the executor (e.g., `<workspace>`, `<marketplace_root>`, `<name>`, `<plugin>`, `<marketplace>` in path globs; `<N>`, `<threshold>` in formulas). These are NOT undefined terms — they are template parameters that the calling phase replaces with concrete values.
+2. **Cross-skill references that the SKILL.md author intentionally leaves as informational pointers** — e.g. "see skill-creator's references/schemas.md" where the load-bearing content is also inlined. Distinguish "broken reference" (REAL defect, no resolution path) from "informational pointer" (intentional courtesy).
+3. **Frontmatter content** — `description` length, trigger phrasing, etc. are owned by `skill-eval`'s static axes; do not re-flag here.
+4. **(Conditional) Structural defects covered by skill-eval `static_check`** — only added when Phase 2.5 successfully ran and produced a `static.json`. Append this exclusion to the list **before Phase 4 dispatches**, with this literal text:
 
    > Structural defects already flagged by skill-eval static_check are out of scope for this audit — see `<workspace>/iteration-0/static.json` for the per-axis results. Auditors that want to verify a specific axis Read the file path; do not re-flag axes covered by the static_check.
 
@@ -20,11 +21,12 @@ The user can add skill-specific intentional design at Phase 2 — e.g., "this se
 
 Phase 6.5 `false-positive-detector` should be aware of these patterns for SKILL.md targets:
 
-- **Auditors flag `subagent_type: general-purpose` as undefined** → FALSE (covered by exclusion default 1)
-- **Auditors flag path-template placeholders such as `<marketplace_root>` / `<workspace>` / `<name>` as undefined** → FALSE (covered by exclusion default 2 — these are runtime substitutions inside path globs, command shapes, or formulas, not undefined terms)
-- **Auditors flag a cross-skill schema reference as "unverifiable"** → REAL only if the load-bearing content is not also inlined; FALSE if it's an informational pointer (exclusion default 3)
-- **Auditors flag frontmatter description as "too long / too short"** → FALSE (exclusion default 4; skill-eval owns this)
+- **Auditors flag path-template placeholders such as `<marketplace_root>` / `<workspace>` / `<name>` as undefined** → FALSE (covered by exclusion default 1 — these are runtime substitutions inside path globs, command shapes, or formulas, not undefined terms)
+- **Auditors flag a cross-skill schema reference as "unverifiable"** → REAL only if the load-bearing content is not also inlined; FALSE if it's an informational pointer (exclusion default 2)
+- **Auditors flag frontmatter description as "too long / too short"** → FALSE (exclusion default 3; skill-eval owns this)
 - **Auditors flag the cost-tier table as "missing the deep tier rationale"** → KNOWN ASYMPTOTE; the per-tier when-to-use column already documents the rationale, but auditors keep wanting a separate "why these tiers" paragraph
+
+For the **`subagent_type: general-purpose`** FP pattern (previously listed here), see `references/shared-blind-spots.md` — it now lives there with the matching shared exclusion default.
 
 For target-type-agnostic patterns that apply equally to claude-md and skill-md targets (e.g., the `(N − threshold + 1)` "missing rationale" pattern), see `references/shared-blind-spots.md`. Phase 6.5 should treat that file's entries plus the entries above as one combined known-FP set.
 

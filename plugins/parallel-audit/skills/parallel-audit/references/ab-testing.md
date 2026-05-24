@@ -23,7 +23,7 @@ Do NOT enable A/B testing when:
 - The Phase 1 symptom is **routine** (no specific symptom → A/B can only measure noise)
 - The Phase 1 symptom is **post-model-upgrade** (the model changed; A/B before/after instruction-file edits won't isolate the model effect)
 - You don't have a benchmark task set (this skill does NOT curate one for you; see "User-supplied requirement" below)
-- The audit budget is tight (A/B roughly doubles the per-iteration cost)
+- The audit budget is tight (A/B multiplies per-iteration cost; the multiplier ranges from ~1.7× at the smallest configuration up to ~9× at the largest — see the cost table below to size against your specific task / trial counts)
 
 ## Why default OFF
 

@@ -8,11 +8,12 @@ This file applies to all CLAUDE.md-family targets: `CLAUDE.md`, `CLAUDE.local.md
 
 Pre-load these as suggested exclusions at Phase 2. The user can deselect any that don't apply to their target.
 
-1. **Claude Code official `subagent_type` values** — `general-purpose`, `Explore`, `Plan`, `claude`, and plugin-namespaced types like `feature-dev:code-architect`. Auditors that lack the user's harness context will flag these as "undefined". The user's `~/.claude/CLAUDE.md` or the harness's system-prompt agent-types list documents them externally; the file legitimately depends on them without re-defining them.
-2. **Documented overrides** — when the file explicitly says "we override the default of X with Y" (e.g., "Phase 4 sonnet-lock overrides the parent-model inheritance default"), auditors sometimes flag this as a CLAUDE.md violation. The override is documented in the file itself; it is intentional.
-3. **Dual-layer designs** — when a CLAUDE.md describes a setup where the harness physically blocks something but CLAUDE.md additionally constrains it (e.g., `find` / `grep` allowed by `permissions.allow` but forbidden by CLAUDE.md text), auditors sometimes flag this as contradictory. It is a deliberate defense-in-depth pattern.
-4. **Tier rules with dual management** — Tier 3 in the user's CLAUDE.md is enforced by both `permissions.deny` (harness layer) and Claude's self-imposed discipline (Claude layer). This duality is intentional; auditors that flag it as "single source of truth violation" are misreading.
-5. **External Claude Code concepts** — `permissions.deny`, `Read tool`, `BashOutput`, `EnterPlanMode`, etc. These are documented in official Claude Code docs; the file legitimately depends on them without re-defining.
+For the **Claude Code official `subagent_type` values** exclusion (previously item 1 here), see `references/shared-blind-spots.md` — it now lives there as a shared exclusion default because both target types need it. The orchestrator merges it into the pre-loaded list at Phase 2.
+
+1. **Documented overrides** — when the file explicitly says "we override the default of X with Y" (e.g., "Phase 4 sonnet-lock overrides the parent-model inheritance default"), auditors sometimes flag this as a CLAUDE.md violation. The override is documented in the file itself; it is intentional.
+2. **Dual-layer designs** — when a CLAUDE.md describes a setup where the harness physically blocks something but CLAUDE.md additionally constrains it (e.g., `find` / `grep` allowed by `permissions.allow` but forbidden by CLAUDE.md text), auditors sometimes flag this as contradictory. It is a deliberate defense-in-depth pattern.
+3. **Tier rules with dual management** — Tier 3 in the user's CLAUDE.md is enforced by both `permissions.deny` (harness layer) and Claude's self-imposed discipline (Claude layer). This duality is intentional; auditors that flag it as "single source of truth violation" are misreading.
+4. **External Claude Code concepts** — `permissions.deny`, `Read tool`, `BashOutput`, `EnterPlanMode`, etc. These are documented in official Claude Code docs; the file legitimately depends on them without re-defining.
 
 The user can add additional intentional design choices at Phase 2 — e.g., "the '1-horsepower cap' metaphor is intentional even if it looks unusual" or "the 'English Feedback' section is intentionally omitted".
 
@@ -20,10 +21,11 @@ The user can add additional intentional design choices at Phase 2 — e.g., "the
 
 Phase 6.5 `false-positive-detector` should be aware of these patterns for CLAUDE.md targets:
 
-- **Auditors flag `subagent_type: general-purpose` as undefined** → FALSE (covered by exclusion default 1)
-- **Auditors flag a documented override as a CLAUDE.md violation** → FALSE (covered by exclusion default 2)
-- **Auditors flag dual-layer enforcement as redundancy / contradiction** → FALSE (covered by exclusion defaults 3 and 4)
-- **Auditors flag a rule citing `permissions.deny` as "undefined term"** → FALSE (covered by exclusion default 5)
+- **Auditors flag a documented override as a CLAUDE.md violation** → FALSE (covered by exclusion default 1)
+- **Auditors flag dual-layer enforcement as redundancy / contradiction** → FALSE (covered by exclusion defaults 2 and 3)
+- **Auditors flag a rule citing `permissions.deny` as "undefined term"** → FALSE (covered by exclusion default 4)
+
+For the **`subagent_type: general-purpose`** FP pattern (previously listed here), see `references/shared-blind-spots.md` — it now lives there with the matching shared exclusion default.
 
 For target-type-agnostic patterns that apply equally to claude-md and skill-md targets (e.g., the `(N − threshold + 1)` "missing rationale" pattern), see `references/shared-blind-spots.md`. Phase 6.5 should treat that file's entries plus the entries above as one combined known-FP set.
 

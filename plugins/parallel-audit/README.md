@@ -24,9 +24,9 @@
 5. **Phase 3**: 各セクションの 1 行目的を draft → batch confirm (`fix-safety-checker` の intent baseline)
 6. **Phase 4**: N 並列 `auditor` を `model: "sonnet"` で同一 turn dispatch
 7. **Phase 5**: per-instance HIGH count + convergent issues (≥ threshold) の 2 表を生成
-8. **Phase 6 / 7**: triage → `false-positive-detector` (REAL / FALSE / NEEDS_HUMAN) → `redundancy-checker` (target_type 分岐: Claude Code defaults または sibling skills, KEEP / SIMPLIFY / REMOVE)
+8. **Phase 6 / 6.5 / 7**: triage → `false-positive-detector` (REAL / FALSE / NEEDS_HUMAN) → `redundancy-checker` (target_type 分岐: Claude Code defaults または sibling skills, KEEP / SIMPLIFY / REMOVE)
 9. **Phase 8 / 9 / 10**: fix draft (single / multi-option) → `fix-safety-checker` (SAFE / NEEDS_REVIEW / UNSAFE) → `AskUserQuestion` で 1 件ずつ承認
-10. **Phase 11**: `Edit` で適用 (CLAUDE.md / CLAUDE.local.md / ~/.claude/skills/* など agent config が auto-mode classifier に拒否されたら明示認可を得て単発リトライ)
+10. **Phase 11**: `Edit` で適用。CLAUDE.md / CLAUDE.local.md / `~/.claude/skills/*` など auto-mode classifier の trigger list に乗る target は Edit の **前に** 明示認可を取得 (pre-authorize)。trigger list 外の target は直接 Edit、ブロック時のみ playbook で reactive リトライ
 11. **Phase 11.5**: post-fix 検証 ─ (a) audit 再 dispatch / (b) optional A/B benchmark (`references/ab-testing.md`) / (c) SKILL.md 対象なら `skill-eval` 静的再 run
 12. **Phase 12**: 収束判定 (全 N が clean / `(N − threshold + 1)` 以上が clean / HIGH 平均プラトー / `max_iterations` / fix candidate 0)
 

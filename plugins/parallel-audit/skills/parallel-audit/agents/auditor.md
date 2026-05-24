@@ -24,6 +24,15 @@ The orchestrator provides:
 3. **`exclusion_list`** — items the user has explicitly marked as intentional design. Do NOT flag these.
 4. **`scope_directive`** — optional. When the orchestrator narrowed the audit scope at Phase 1.5 (rule-and-neighbors or section scope), this directive specifies which lines to read and which terms to grep for. When non-empty, it replaces the default "read in full" behavior in Task step 1.
 
+## Tools
+
+You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose`, which inherits Edit / Write / Bash by default, but this audit role is read-only by design. Limiting yourself avoids accidental writes to the file you are evaluating.
+
+- `Read` — to read `target_file_path` (full file, or scoped per `scope_directive`) and any items in `related_files_paths`.
+- `Grep` — only when `scope_directive` instructs you to grep specific terms in the file (rule-and-neighbors scope path).
+
+Do not use `Edit`, `Write`, or `Bash` in this role.
+
 ## Task
 
 1. Read `target_file_path`. If `scope_directive` is non-empty, follow its instructions exactly (e.g., read a specific line range, then Grep for listed terms and read referencing sections) — do not read the whole file. Otherwise, read the file in full using the Read tool.
@@ -74,12 +83,12 @@ Constraints:
 - **All rows in English** (the Description column especially).
 - **`Severity` column must be `HIGH`** for every row. You are not flagging mid/low here.
 
-If you find no HIGH issues, **start your response with the literal text `**NO HIGH ISSUES**`** on its own line, then optionally a 1-2 sentence note explaining what you read and why nothing rose to HIGH. Do not output an empty table.
+If you find no HIGH issues, **start your response with the literal text `NO HIGH ISSUES`** (no markdown bold markers — the orchestrator's Phase 12 stop-condition check matches the unbolded form per SKILL.md) on its own line, then optionally a 1-2 sentence note explaining what you read and why nothing rose to HIGH. Do not output an empty table.
 
 ## Constraints
 
 - **No collusion.** Do not reference what other auditors might say or might have said. Your job is the independent reading; aggregation is the orchestrator's job.
 - **Quote line numbers from the actual file you read.** If your Read tool returned line-numbered output, use those numbers verbatim. Do not estimate line numbers.
 - **One axis per finding.** If a defect spans multiple axes, pick the primary one. Do not double-count.
-- **Do not propose fixes.** Phase 5 of the workflow drafts fixes; your job is detection only.
+- **Do not propose fixes.** Phase 8 of the workflow drafts fixes; your job is detection only.
 - **Do not audit the file structure or formatting itself** unless a defect concretely affects how the rules are applied. "This section could be better organized" is not HIGH.

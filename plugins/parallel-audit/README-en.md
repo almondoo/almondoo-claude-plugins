@@ -24,9 +24,9 @@ Iterates until convergence or `max_iterations` (default `3`):
 5. **Phase 3**: draft a one-line purpose per section, then batch-confirm (the intent baseline used by `fix-safety-checker`)
 6. **Phase 4**: dispatch N parallel `auditor` agents with `model: "sonnet"` in a single turn
 7. **Phase 5**: produce two tables — per-instance HIGH count, and convergent issues (≥ threshold)
-8. **Phase 6 / 7**: triage → `false-positive-detector` (REAL / FALSE / NEEDS_HUMAN) → `redundancy-checker` (target_type-branched: Claude Code defaults or sibling skills, KEEP / SIMPLIFY / REMOVE)
+8. **Phase 6 / 6.5 / 7**: triage → `false-positive-detector` (REAL / FALSE / NEEDS_HUMAN) → `redundancy-checker` (target_type-branched: Claude Code defaults or sibling skills, KEEP / SIMPLIFY / REMOVE)
 9. **Phase 8 / 9 / 10**: fix draft (single / multi-option) → `fix-safety-checker` (SAFE / NEEDS_REVIEW / UNSAFE) → per-fix approval via `AskUserQuestion`
-10. **Phase 11**: apply with `Edit` (if an agent config such as CLAUDE.md / CLAUDE.local.md / ~/.claude/skills/* is rejected by the auto-mode classifier, obtain explicit authorization and retry once)
+10. **Phase 11**: apply with `Edit`. For targets on the auto-mode classifier trigger list (CLAUDE.md / CLAUDE.local.md / `~/.claude/skills/*` etc.), obtain explicit authorization **before** issuing Edit (pre-authorize). For targets off the trigger list, Edit directly and fall back to the reactive playbook only if blocked
 11. **Phase 11.5**: post-fix verification — (a) re-dispatch audit / (b) optional A/B benchmark (`references/ab-testing.md`) / (c) re-run `skill-eval` static check when target is SKILL.md
 12. **Phase 12**: convergence check (all N clean / at least `(N − threshold + 1)` clean / HIGH-count plateau / `max_iterations` / zero fix candidates)
 

@@ -13,7 +13,7 @@ Multiple subagents can converge on the same wrong answer. They share training da
 - The issue claims a "contradiction" between sections that's actually a deliberate layered design
 - The issue flags an enumeration as "incomplete" when the surrounding text explicitly says "representative, not exhaustive"
 
-This agent runs after Phase 6 triage and before Phase 8 fix proposal of the parallel-audit workflow, with a fresh independent read.
+This agent runs after Phase 6 triage and before Phase 7 redundancy classification (which itself precedes Phase 8 fix drafting) of the parallel-audit workflow, with a fresh independent read.
 
 ## Input
 
@@ -31,6 +31,14 @@ You will be given:
    ```
 4. **`exclusion_list`** — the user-provided list of intentional design choices that must not be flagged
 5. **`known_fp_patterns`** — pre-loaded known-false-positive patterns. The orchestrator builds this as the union of (the target-type-specific specifics document's "Common shared-blind-spot patterns" section) + (the target-type-agnostic `references/shared-blind-spots.md` entries). Each entry takes the form `<auditor flag description> → <FALSE | NEEDS_HUMAN | KNOWN_ASYMPTOTE> (<one-line reason or pointer>)`. Use this set as the **first check** before doing your independent re-read — if a convergent issue clearly matches one of these entries, you can return the documented verdict with the matched entry as evidence, without re-reading the file in full. If no entry matches, proceed to the independent re-read in step 1 of Task.
+
+## Tools
+
+You should use only these tools — the orchestrator dispatches you as `subagent_type: general-purpose` (which inherits Edit / Write / Bash by default), but this verifier role is read-only by design.
+
+- `Read` — with `offset` and `limit` to fetch the cited line range ± 10 lines, plus selective reads of `related_files` when an issue references them.
+
+Do not use `Edit`, `Write`, `Bash`, or `Grep` in this role.
 
 ## Task
 
@@ -58,7 +66,7 @@ Return a markdown table:
 
 Possible verdicts:
 
-- **REAL** — the issue is genuinely a defect. Forward to Phase 5 for fix proposal.
+- **REAL** — the issue is genuinely a defect. Forward to Phase 7 (redundancy classification), then Phase 8 (fix drafting).
 - **FALSE** — the issue is a shared blind spot / context Claude Code auditors missed. Do not fix. Add a 1-sentence note explaining why so the main thread can communicate this to the user.
 - **NEEDS_HUMAN** — the issue is real-looking but the fix decision depends on a judgment call the user must make (e.g., architectural tension boundary). Surface to user with options.
 
@@ -66,6 +74,6 @@ Possible verdicts:
 
 - **One independent re-read per issue.** Do not be influenced by the original auditors' phrasing — they may have anchored on each other.
 - **Cite specific lines and quoted text** in `evidence / reasoning`. "I think this is OK" is not sufficient — show what you read.
-- **Do not propose fixes.** That's Phase 5's job. Only verify whether the issue is real.
+- **Do not propose fixes.** That's the downstream fix-drafting phase's job (Phase 8). Only verify whether the issue is real.
 - **Do not re-audit the whole file.** Only re-examine the specific issues passed in.
 - **Trust the exclusion list.** If an issue conflicts with an exclusion, mark it FALSE and note the conflict — this signals a triage error to the main thread.
