@@ -44,6 +44,7 @@ If `ToolSearch` returns an error for any of these tool names, stop and report to
 ### Lead's first actions (first 3-5 minutes)
 
 1. **Parse the argument and grasp the user's intent**
+   - The argument is exposed as `$ARGUMENTS` here (the raw text the user passed to `/agent-teams`). If `$ARGUMENTS` is empty, ask the user for the task description via `AskUserQuestion`.
    - If there is an issue number, fetch it with `gh issue view <N>`
    - Check for overlap with existing commits via `git log --grep` etc.
    - If anything is unclear, ask via AskUserQuestion (e.g. "Which area should we start from?")
@@ -78,13 +79,15 @@ Do not silently execute `TeamCreate` / `TaskCreate` / spawn without approval —
 
 Every task needs the following roles. Whether they are dedicated or combined depends on scale, but no role may be omitted.
 
-| Role | Primary responsibilities |
-|------|--------------------------|
-| **Team Lead** (you) | Task splitting, progress tracking, integration, final decisions, **exclusive execution of `git add` (per-path) and `git commit` (no amend)** |
-| **Implementer** (≥1) | Feature implementation, unit test authoring, local verification (`<TEST_RUNNER_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`) → request commits from the Lead |
-| **Reviewer** | Code review, spec compliance, security review (when combined) |
-| **Tester** | One final full regression run at the end of a wave |
-| **Security Checker** | Dedicated security review (may be combined with Reviewer depending on conditions) |
+| Role | Canonical handle (`SendMessage` target) | Primary responsibilities |
+|------|------------------------------------------|--------------------------|
+| **Team Lead** (you) | `team-lead` | Task splitting, progress tracking, integration, final decisions, **exclusive execution of `git add` (per-path) and `git commit` (no amend)** |
+| **Implementer** (≥1) | `impl-<area><N>` (e.g. `impl-doc1`, `impl-api2`) | Feature implementation, unit test authoring, local verification (`<TEST_RUNNER_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`) → request commits from the Lead |
+| **Reviewer** | `reviewer-code` | Code review, spec compliance, security review (when combined) |
+| **Tester** | `tester-regression` | One final full regression run at the end of a wave |
+| **Security Checker** | `security-checker` | Dedicated security review (may be combined with Reviewer depending on conditions) |
+
+The handle column is the literal value passed to `Agent({ name: "<handle>", … })` at spawn time, and the same value Lead uses as `SendMessage({ to: "<handle>", … })`. Implementer handles follow `impl-<area><N>` where `<area>` matches the wave's scope prefix (D / A / AI / UI) and `<N>` is the per-area index (e.g. `impl-doc1`, `impl-doc2`, `impl-api1`).
 
 ### Lead responsibilities summary
 
@@ -144,8 +147,8 @@ If two teammates edit the same file in parallel, one's changes overwrite the oth
 
 ### Rules when splitting tasks
 
-1. **Split owners along file boundaries**: align task boundaries with file boundaries. When splitting "implement feature A", assign file X to Implementer A and file Y to Implementer B.
-2. **Consolidate shared-file changes into one person**: if multiple tasks need to change the same file (e.g. index.ts, config, shared type definitions), consolidate edits to that file under a single teammate, or serialize them across Waves (via `TaskUpdate({ taskId, addBlockedBy: [...] })`) so they never run concurrently.
+1. **Split owners along file boundaries**: align task boundaries with file boundaries. When splitting "implement feature A", assign file X to `impl-area1` and file Y to `impl-area2`.
+2. **Consolidate shared-file changes into one person**: if multiple tasks need to change the same file (e.g. index.ts, config, shared type definitions), consolidate edits to that file under a single teammate, or serialize them across Waves (via `TaskUpdate({ taskId, addBlockedBy: [...] })` — `TaskCreate` itself does not accept any `blocked_by` field, so dependencies are always wired post-creation) so they never run concurrently.
 3. **State assigned files explicitly in the spawn prompt**: list the files each teammate may edit, and state explicitly that all other files are off-limits.
 
 ## Lead's git permissions (canonical definition)
@@ -245,8 +248,8 @@ Iteration 1 → 2 fix cycles are expected and healthy. Convergence by iteration 
 When there are multiple Implementers, or when one can pick up the next task while waiting on a review:
 
 ```
-Implementer A: task 1 implementation done → review pending → starts task 3
-Implementer B: implementing task 2
+impl-doc1: task 1 implementation done → review pending → starts task 3
+impl-doc2: implementing task 2
 Reviewer: reviewing task 1
 
 * But never run tasks that touch the same file in parallel.
@@ -269,8 +272,10 @@ For a detailed checklist, see `assets/lead-checklist.md`.
 
 ### Skill-active `Agent`-tool prohibition (overrides the global parallelism rule)
 
-- **Use the `Agent` tool to dispatch parallel implementation / review / test / security work while this skill is active**: all parallelism in this skill MUST go through `TeamCreate` + `TaskCreate` + teammate dispatch (and SendMessage interaction). The global "Parallel Execution for Speed" directive — "2+ independent subtasks → parallel `Agent` calls" — is **explicitly overridden for the duration of this skill**. The agent-teams flow IS the parallelism mechanism here; routing around it via `Agent` defeats every quality gate (Reviewer, Tester, Security Checker) and the Lead's exclusive git control, and structurally re-introduces the race conditions this skill was built to eliminate.
-  - Allowed exception (Phase 1 only): the Lead may use `Agent` with `subagent_type: Explore` for **read-only** investigation (issue lookup, code exploration, doc search) to shorten Phase 1 planning. This is read-only and bypasses no quality gate. From **Phase 2 onward (TeamCreate done), all `Agent` invocations are forbidden** without exception — implementation, review, test, and security work must be done by teammates spawned through the team mechanism, not by `Agent` subagents.
+- **Use the `Agent` tool to dispatch parallel implementation / review / test / security work outside the team mechanism while this skill is active**: all parallelism in this skill MUST go through `TeamCreate` + `TaskCreate` + teammate dispatch (and SendMessage interaction). The global "Parallel Execution for Speed" directive — "2+ independent subtasks → parallel `Agent` calls" — is **explicitly overridden for the duration of this skill**. The agent-teams flow IS the parallelism mechanism here; routing around it via free-form `Agent` calls defeats every quality gate (Reviewer, Tester, Security Checker) and the Lead's exclusive git control, and structurally re-introduces the race conditions this skill was built to eliminate.
+  - **What counts as "team-spawn dispatch" (allowed)**: `Agent({ team_name, name, subagent_type, prompt, … })` invocations whose purpose is to spawn a teammate that joins the team. These are the Phase 2 spawn calls described in the Workflow above; they are not "free-form `Agent` calls".
+  - **What counts as "free-form `Agent` calls" (forbidden once `TeamCreate` is done)**: any `Agent` invocation without `team_name` (i.e. not joining the team) for implementation, review, test, or security work. From **Phase 2 onward (TeamCreate done), free-form `Agent` invocations are forbidden** without exception.
+  - Allowed exception (Phase 1 only): the Lead may use `Agent` with `subagent_type: Explore` for **read-only** investigation (issue lookup, code exploration, doc search) to shorten Phase 1 planning. This is read-only and bypasses no quality gate.
 - **"Fall back to `Agent` because TeamCreate / TaskCreate / SendMessage failed"**: do not. A failed call means Step 0 was skipped or the tool name is wrong. Re-run `ToolSearch` and fix the call; never silently substitute `Agent`.
 
 ### Composition / spawn

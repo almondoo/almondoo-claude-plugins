@@ -45,7 +45,17 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
   - [ ] SendMessage the Implementer with a fix request (cite specific file:line + fix proposal)
   - [ ] On Implementer fix completion → run the fix commit via the proxy procedure above
   - [ ] SendMessage the Reviewer for a re-review
-  - [ ] Repeat until Critical/Important is zero
+  - [ ] **Track per-task fix iteration count locally** (a private note, not in the TaskCreate description — teammates write there too and races clobber notes)
+  - [ ] Repeat until Critical/Important is zero **or `MAX_FIX_ITERATIONS = 3` is reached**
+- [ ] If iteration 3 still produces Critical / Important on the same task (non-convergence):
+  - [ ] Halt this task's fix cycle
+  - [ ] Ask the Reviewer to summarize the remaining findings
+  - [ ] Ask the Implementer for a brief non-convergence diagnosis
+  - [ ] **Escalate to the user via `AskUserQuestion`** with three options:
+    - (1) Defer this task to a follow-up issue and continue the wave with what passes
+    - (2) Reassign the task to a different Implementer (fresh context)
+    - (3) Pause for new direction from the user
+  - [ ] Continue the rest of the wave (do NOT block other Implementers on a single stuck task)
 - [ ] On PASS:
   - [ ] Minor items don't require fixes in this PR; tell the Implementer they'll be follow-ups
   - [ ] Proceed to the next task or wave completion

@@ -31,32 +31,9 @@ End of wave (all commits + all fix commits done + all Reviewer PASS):
 
 ## 2. Lightweight Tester output format
 
-State the following explicitly in the Tester spawn prompt:
+The canonical format (`On PASS` 3-5 lines / `On FAIL` blocker details / "Not needed" exclusions) lives in `assets/spawn-prompts/tester.md` under "Output format". The Lead's responsibility here is to make sure that template is the one substituted into the Tester's spawn prompt, not a verbose hand-written variant.
 
-### On PASS (3-5 lines is enough)
-
-```
-- XXXX/XXXX tests pass (delta +N)
-- typecheck OK
-- lint OK (only N pre-existing warnings, 0 warnings in new files)
-- No off-target contamination
-- Push not performed (ahead N commits)
-```
-
-### On FAIL, include details
-
-- Blocker test name (e.g. `lib/<your-module>/foo/__tests__/bar.unit.test.ts > "X should reject Y"`)
-- Full error message
-- For typecheck errors: file:line + error code
-- For lint errors: file:line + rule name
-
-### Not needed
-
-- Tables (per-commit detail rows)
-- Line-number-annotated analysis (that's the Reviewer's territory)
-- Per-metric verdicts (e.g. "12 acceptance-criteria cases covered" is Reviewer's territory)
-
-Excessive detail accelerates context pressure and raises the risk of late-wave unresponsiveness.
+Why the cap on verbosity: tables, line-number-annotated analysis, and per-metric verdicts are the Reviewer's territory; folding them into the Tester accelerates context pressure and raises the risk of late-wave unresponsiveness.
 
 ## 3. Lead direct-verification fallback route
 

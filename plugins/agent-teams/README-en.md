@@ -28,11 +28,11 @@ Size the team by task scale:
 The typical pattern is **"4 in parallel + 2 blocked_by"**, six tasks total.
 
 ```
-Wave A (4 tasks in parallel): impl-A / impl-B / impl-C / impl-D
-Wave B (blocked_by Wave A): 2 tasks
+Wave 1 (4 tasks in parallel): impl-doc1 / impl-doc2 / impl-api1 / impl-api2
+Wave 2 (blocked_by Wave 1): 2 tasks (impl-ai1 / impl-ui1, or Wave 1 Implementers re-assigned once Wave 1 finishes)
 ```
 
-Naming convention: `W<n>-<D|A|AI|UI><id>` (D=doc, A=api, AI=ai, UI=ui).
+Task naming convention: `W<n>-<D|A|AI|UI><id>` (D=doc, A=api, AI=ai, UI=ui). Implementer handle convention: `impl-<area><N>`.
 
 ## File ownership
 
