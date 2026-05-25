@@ -2,6 +2,20 @@
 
 Claude Code plugin marketplace (`almondoo-claude-plugins`).
 
+## Security check before code changes
+
+Before editing or generating **any** code in this repository, briefly assess the security impact and surface the risk **before** writing the change. Even small edits ship to anyone who installs the plugin, so the time to think about safety is up-front, not after the diff exists. Triggers (apply this check whenever the change touches any of these):
+
+- **Plugin scripts that execute under the user's shell** (`plugins/*/skills/*/scripts/*.{sh,py,js,ts}`): verify quoting, argument validation, no unguarded `eval` / `exec` / unquoted variable expansion, no command injection from `$ARGUMENTS` / user-supplied paths.
+- **Spawn-prompt / SKILL.md placeholder interpolation**: a `<PLACEHOLDER>` substituted from user input or `gh` / `git` output can carry shell metacharacters or prompt-injection payloads downstream. Treat external strings as untrusted at the substitution boundary.
+- **Authentication / authorization, secrets, PII, sensitive-data handling** — including log lines, error messages, and AskUserQuestion previews that might echo a token or key.
+- **Injection / path-traversal vectors** when parsing external input into shell, JSON, SQL, HTML, regex, or template engines.
+- **Dependency or distribution changes** (`plugin.json` / `marketplace.json` / runtime deps a script pulls): supply-chain risk; pin or pre-verify upstream.
+- **Loosening an existing safety constraint** — relaxing a deny rule, broadening an allow-list, removing validation, or weakening a tier-2/tier-3 boundary from the user-level CLAUDE.md.
+- **New external write paths** (network calls, filesystem writes outside `tmp/`, MCP / API mutations).
+
+If a trigger applies, state the risk and its mitigation in one or two sentences before applying the edit. When the user has explicitly asked for a change that introduces a security risk, surface the risk so they can decide rather than silently accepting it.
+
 ## Layout
 
 - Register every `plugins/<name>/skills/<name>/SKILL.md` in the root `.claude-plugin/marketplace.json`.
