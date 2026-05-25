@@ -61,7 +61,7 @@ Do not try to "fix it" with `git reset` / `--amend`. **Always consult the Lead v
 
 ## Implementer workflow
 
-1. Implementation done → local verification (`bun vitest run` / `typecheck` / `lint`) returns green
+1. Implementation done → local verification (`<TEST_RUNNER_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`) returns green
 2. SendMessage to the Lead to **request a commit**:
    ```
    [W1-D1 commit request ready]

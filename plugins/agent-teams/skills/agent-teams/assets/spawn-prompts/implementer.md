@@ -37,11 +37,11 @@ When writing tests like `'foo\x00bar'` for NULL-byte rejection, **Edit/Write too
 2. Self-claim the lowest-ID **W<n>** task: `TaskUpdate({ taskId, owner: "<NAME>", status: "in_progress" })`
 3. **TaskGet** and read the full description
 4. **Create only your owned files via Write** (no editing existing files)
-5. Create unit tests via Vitest at the same time (meeting the minimum case count in acceptance criteria)
+5. Create unit tests via `<UNIT_TEST_FRAMEWORK>` (e.g. Vitest / Jest / Pytest) at the same time (meeting the minimum case count in acceptance criteria)
 6. Local verification (via Bash):
-   - `bun vitest run <target test>` → green
-   - `bun --filter '*' typecheck && bun run typecheck` → green
-   - `bun --filter '*' lint && bun run lint` → green
+   - `<TEST_RUNNER_COMMAND> <target test>` → green (e.g. `bun vitest run <path>`, `pytest <path>`)
+   - `<TYPECHECK_COMMAND>` → green
+   - `<LINT_COMMAND>` → green
    - **literal control-byte check** (python3 above) → `[]`
 7. **SendMessage the Lead to request a commit**:
    ```
@@ -61,7 +61,7 @@ Take `<PRIORITY_TASK_ID>` first (e.g. W1-D1). If already taken, take the next av
 ## CLAUDE.md non-negotiables (strict)
 <PROJECT_SPECIFIC_CLAUDEMD_CONSTRAINTS>
 Example:
-- `<package manager>` only (e.g. bun / pnpm / yarn — pick one), no schema-layer edits, no new dependencies
+- `<package manager>` only (pick one: bun / pnpm / yarn / npm / pip / cargo / go etc.), no schema-layer edits, no new dependencies
 - Pinned framework version held (e.g. `<auth-framework> <version> pinned`)
 - Use Read/Grep/Glob/Edit/Write (no cat/grep/find/sed/echo)
 - Do not edit off-target files
@@ -95,4 +95,8 @@ Begin.
 | `<TASK_ID>` | Assigned task ID | `W1-D1` |
 | `<PRIORITY_TASK_ID>` | Priority pick ID | `W1-D1 (#1)` |
 | `<COMMIT_MESSAGE_DRAFT>` | Proposed commit message | `feat(<area>): #<N> ...` |
+| `<UNIT_TEST_FRAMEWORK>` | Test framework Implementers use | `Vitest` / `Jest` / `Pytest` / Rust built-in test |
+| `<TEST_RUNNER_COMMAND>` | Single-file/target test runner | `bun vitest run` / `pnpm vitest run` / `pytest` / `cargo test --test` |
+| `<TYPECHECK_COMMAND>` | Type checker | `bun --filter '*' typecheck && bun run typecheck` / `tsc -b` / `mypy .` / `cargo check` |
+| `<LINT_COMMAND>` | Linter | `bun --filter '*' lint && bun run lint` / `eslint .` / `ruff check` / `cargo clippy` |
 | `<PROJECT_SPECIFIC_*>` | Project-specific constraints | CLAUDE.md / past reviewer patterns |

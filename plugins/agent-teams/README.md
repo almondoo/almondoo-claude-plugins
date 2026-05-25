@@ -63,6 +63,16 @@ Wave B (Wave A 完了に blocked_by): 2 タスク
 | `references/implementer-pitfalls.md` | リテラル制御バイト等の頻発落とし穴 |
 | `references/tester-optimization.md` | Tester 依頼集約原則 + Lead 直接検証ルート |
 
+## 前提条件
+
+このスキルは Claude Code の **Agent Teams** ランタイム (`TeamCreate` / `TaskCreate` / `TaskUpdate` / `TaskList` / `TaskGet` / `SendMessage` / `TeamDelete` といった deferred tool 群) に依存します。利用前に以下を確認してください。
+
+- Claude Code **CLI** で起動していること（VSCode 拡張ではタスク管理ツールが過去に無効化されていた経緯があるため、本スキルは CLI 経由を推奨）
+- Agent Teams 機能が有効な比較的新しいバージョンであること
+- 環境によっては experimental flag (例: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) で gating されている場合があるため、ご利用バージョンの公式 docs を確認してください
+
+Step 0 の `ToolSearch` が 7 個のスキーマを全部返さない場合は、Lead は `AskUserQuestion` でユーザに報告し、`Agent` ツールへのフォールバックは行いません（フォールバックすると Lead 集中 git 制御や品質ゲートが構造的に崩壊するため）。
+
 ## インストール
 
 ```

@@ -1,9 +1,19 @@
 ---
 name: agent-teams
-description: Implement multiple tasks in parallel with quality gates via agent teams. Use for digesting an entire issue, building large features in waves, or adding multiple helpers in one shot. Spawns Implementer + Reviewer + Tester team, with the Lead holding exclusive control over `git add` / `git commit` to prevent race conditions while progressing wave by wave.
+description: Orchestrate a multi-role agent team (Lead + Implementer + Reviewer + Tester, plus optional dedicated Security Checker) to deliver multiple tasks in Waves with built-in quality gates. Use for digesting an entire issue, building large features in waves, or adding multiple helpers in one shot. The Lead holds exclusive control over `git add` / `git commit` to prevent shared-workspace race conditions while progressing wave by wave.
 disable-model-invocation: true
-argument-hint: Task description (e.g. "work through issue 123" / "implement auth feature" / "add several helpers in parallel")
+argument-hint: [task description | issue number]
 ---
+
+## Prerequisites
+
+This skill depends on the Claude Code **Agent Teams** runtime (the deferred tools `TeamCreate` / `TaskCreate` / `TaskUpdate` / `TaskList` / `TaskGet` / `SendMessage` / `TeamDelete`). Confirm before invoking:
+
+- Claude Code CLI (the VSCode extension has historically disabled the `Task*` family — prefer the CLI for this skill).
+- Recent CLI version with the Agent Teams feature available.
+- If your environment requires it, the Agent Teams capability may be gated behind an experimental flag (e.g. `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`); verify against the version of Claude Code you are running.
+
+If `ToolSearch` in Step 0 (below) does not return all seven schemas, stop and report to the user via `AskUserQuestion` — do not silently substitute `Agent`.
 
 # Agent Teams: Best Practice Team Composition
 
@@ -21,10 +31,11 @@ As the very first action when the skill starts, run `ToolSearch` exactly once, b
 
 ```
 ToolSearch({
-  query: "select:TeamCreate,TaskCreate,SendMessage,TaskUpdate,TeamDelete,TaskList,TaskGet",
-  max_results: 7
+  query: "select:TeamCreate,TaskCreate,SendMessage,TaskUpdate,TeamDelete,TaskList,TaskGet"
 })
 ```
+
+(`select:<name1>,<name2>,...` is an exact-name fetch; `max_results` is unused in this mode.)
 
 **Why this matters**: the `Agent` tool is always loaded directly and has zero call-time friction, while the team-management tools above are deferred. This asymmetry creates a silent-fallback pressure: if you start planning before loading these tools, the path of least resistance is to dispatch parallel work via `Agent` instead, which **breaks every core invariant of this skill** (Lead-exclusive git, 1 task = 1 commit, contamination detection, Tester consolidation, Phase 2 simultaneous spawn). Loading once upfront removes that pressure.
 
@@ -51,9 +62,15 @@ If `ToolSearch` returns an error for any of these tool names, stop and report to
    When in doubt, AskUserQuestion. Silent spawn from a guessed interpretation is forbidden.
 
 2. **Enter Plan mode and draft an implementation plan** (see Workflow Phase 1 below)
-3. **Decide the team composition** (see "Deciding the team composition" below)
-4. **Decide the Wave structure** (typical: 4 in parallel + 2 blocked_by; details in `assets/wave-template.md`)
-5. **Present the plan to the user → get approval → proceed to Phase 2 spawn**
+3. **Identify the project's verification commands** — these will be substituted into spawn prompts so the skill stays language-/stack-agnostic. Determine each from the repository (`package.json` scripts, `pyproject.toml`, `Cargo.toml`, etc.) before Phase 2:
+   - `<TEST_RUNNER_COMMAND>` — single-file/target unit test runner (e.g. `bun vitest run`, `pnpm vitest run`, `jest`, `pytest`, `cargo test --test`)
+   - `<FULL_TEST_COMMAND>` — full unit-test suite (e.g. `bun run test:unit`, `pnpm test`, `pytest`, `cargo test`)
+   - `<TYPECHECK_COMMAND>` — type checking (e.g. `bun --filter '*' typecheck && bun run typecheck`, `tsc -b`, `mypy .`, `cargo check`)
+   - `<LINT_COMMAND>` — linting (e.g. `bun --filter '*' lint && bun run lint`, `eslint .`, `ruff check`, `cargo clippy`)
+   - `<UNIT_TEST_FRAMEWORK>` — the framework Implementers should author tests in (e.g. Vitest, Jest, Pytest, Rust's built-in test)
+4. **Decide the team composition** (see "Deciding the team composition" below)
+5. **Decide the Wave structure** (typical: 4 in parallel + 2 blocked_by; details in `assets/wave-template.md`)
+6. **Present the plan to the user → get approval → proceed to Phase 2 spawn**
 
 Do not silently execute `TeamCreate` / `TaskCreate` / spawn without approval — these are large operations, so confirming user intent is mandatory.
 
@@ -64,7 +81,7 @@ Every task needs the following roles. Whether they are dedicated or combined dep
 | Role | Primary responsibilities |
 |------|--------------------------|
 | **Team Lead** (you) | Task splitting, progress tracking, integration, final decisions, **exclusive execution of `git add` (per-path) and `git commit` (no amend)** |
-| **Implementer** (≥1) | Feature implementation, unit test authoring, local verification (vitest / typecheck / lint) → request commits from the Lead |
+| **Implementer** (≥1) | Feature implementation, unit test authoring, local verification (`<TEST_RUNNER_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`) → request commits from the Lead |
 | **Reviewer** | Code review, spec compliance, security review (when combined) |
 | **Tester** | One final full regression run at the end of a wave |
 | **Security Checker** | Dedicated security review (may be combined with Reviewer depending on conditions) |
@@ -128,7 +145,7 @@ If two teammates edit the same file in parallel, one's changes overwrite the oth
 ### Rules when splitting tasks
 
 1. **Split owners along file boundaries**: align task boundaries with file boundaries. When splitting "implement feature A", assign file X to Implementer A and file Y to Implementer B.
-2. **Consolidate shared-file changes into one person**: if multiple tasks need to change the same file (e.g. index.ts, config, shared type definitions), consolidate edits to that file under a single teammate, or serialize them across Waves (`blocked_by`) so they never run concurrently.
+2. **Consolidate shared-file changes into one person**: if multiple tasks need to change the same file (e.g. index.ts, config, shared type definitions), consolidate edits to that file under a single teammate, or serialize them across Waves (via `TaskUpdate({ taskId, addBlockedBy: [...] })`) so they never run concurrently.
 3. **State assigned files explicitly in the spawn prompt**: list the files each teammate may edit, and state explicitly that all other files are off-limits.
 
 ## Lead's git permissions (canonical definition)
@@ -157,11 +174,11 @@ Implementers must not execute any destructive git operations. They only implemen
 ### Phase 2: Create the team and spawn everyone at once
 
 1. **TeamCreate** to make the team
-2. Split tasks and register with **TaskCreate**
-   - Set `blocked_by` to express dependencies (Wave structure)
+2. Register each task with **TaskCreate** (one call per task), then **TaskUpdate** to wire dependencies
+   - Dependencies are expressed via `TaskUpdate({ taskId, addBlockedBy: [<upstream-id>, …] })`. `TaskCreate` itself accepts only `subject` / `description` / `activeForm` / `metadata` — there is no `blocked_by` field on `TaskCreate`
    - Aim for ~5-6 tasks per teammate
 3. Remind the user to enable **Delegate mode (Shift+Tab)** (so the Lead doesn't hijack implementation)
-4. **Spawn every role's teammate at once in Phase 2** (Implementer + Reviewer + Tester, plus Security Checker if needed)
+4. **Spawn every role's teammate at once in Phase 2** (Implementer + Reviewer + Tester, plus Security Checker if needed) using the `Agent` tool with `team_name: "<team>"` and `name: "<handle>"` parameters so each spawned agent joins the team
    - State explicitly in the spawn prompt that Reviewer / Tester "wait until SendMessage instructs you"
    - "Spawn the Reviewer after implementation finishes" is forbidden: spawning on demand loses context and degrades review quality
 
@@ -189,7 +206,7 @@ The Lead acts purely as an **orchestrator**. Never use the Edit tool on code (im
 ```
 1. Implementer self-claims a task and starts working
 2. Implementer finishes implementation + local verification → SendMessage to Lead to request a commit
-   (Request contents: file paths, counts (vitest pass + typecheck/lint green), acceptance criteria, control-byte check `[]`, proposed commit message)
+   (Request contents: file paths, counts (unit-test pass + typecheck/lint green), acceptance criteria, control-byte check `[]`, proposed commit message)
 3. Lead checks scope with `git status` → runs `git add <per-path>` → `git commit -m "..."` on their behalf
 4. Lead → SendMessage to Implementer: "commit <hash> done" → Implementer marks TaskUpdate completed
 5. Lead → SendMessage to Reviewer: "Please review commit <hash>, files: ..."
@@ -268,10 +285,10 @@ For a detailed checklist, see `assets/lead-checklist.md`.
 ### Lead-related
 - **Hijack implementation**: use Delegate mode and stay focused on coordination
 - **Use Edit / Write to fix code yourself**: no matter how small the fix, send a SendMessage to the Implementer. If the Lead touches code, the Reviewer / Tester quality gates are bypassed
-- **Run destructive git operations other than `add` / `commit`**: `git reset` / `--amend` / `git restore` / `git push` / `git rebase` / `git merge` / `git revert` / `stash drop|clear` / `branch -D` / `clean` etc. are forbidden even for the Lead. Trying to "clean things up" with a destructive operation causes history-destruction incidents. When such an operation is genuinely needed, ask the user to run it manually via AskUserQuestion
+- **Run destructive git operations other than `add` (per-path) / `commit` (no amend)**: forbidden even for the Lead. The canonical list of "everything beyond `add` / `commit`" lives in the "Lead's git permissions" section above and in `references/git-permissions.md`; consult one of those rather than relying on memory. Trying to "clean things up" with a destructive operation causes history-destruction incidents. When such an operation is genuinely needed, ask the user to run it manually via AskUserQuestion
 - **Bundle multiple tasks into one commit**: strict "1 task = 1 commit". A commit that mixes tasks ends up with a commit message that can only mention one of them, and splitting it later requires destructive operations
 - **Do "leftover work" after disbanding the team**: every piece of work must be completed by a teammate. The Lead doing "the final polish" collapses the quality gate
-  - Exception: when the Tester becomes unresponsive, the Lead may run read-only verification commands (e.g. `bun run test:unit`) on its behalf — this does not count as bypassing the quality gate (see `references/tester-optimization.md`)
+  - Exception: when the Tester becomes unresponsive, the Lead may run read-only verification commands (the project's `<FULL_TEST_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`) on its behalf — this does not count as bypassing the quality gate (see `references/tester-optimization.md`)
 
 ### Implementer-related
 - **Let Implementers run destructive git operations**: destructive operations including `git add` / `git commit` are forbidden on the Implementer side; the Lead runs them. If Implementers commit concurrently, race conditions pull in other teammates' untracked / staged files. Non-destructive ones (status / log / diff / fetch / stash push|pop etc.) are free for Implementers too

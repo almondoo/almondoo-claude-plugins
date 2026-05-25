@@ -63,6 +63,16 @@ In a past Wave, per-commit Tester requests caused the Tester to become unrespons
 | `references/implementer-pitfalls.md` | Frequent traps (literal control bytes, off-target edits, etc.) |
 | `references/tester-optimization.md` | Tester request consolidation + Lead direct-verification fallback |
 
+## Prerequisites
+
+This skill depends on the Claude Code **Agent Teams** runtime (the deferred tools `TeamCreate` / `TaskCreate` / `TaskUpdate` / `TaskList` / `TaskGet` / `SendMessage` / `TeamDelete`). Confirm before invoking:
+
+- Claude Code **CLI** (the VSCode extension has historically disabled the task-management tools — prefer the CLI for this skill).
+- A recent CLI version with the Agent Teams feature available.
+- Depending on your environment, the Agent Teams capability may be gated behind an experimental flag (e.g. `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`); check the official docs for the version you are running.
+
+If the Step 0 `ToolSearch` does not return all seven schemas, the Lead reports the failure via `AskUserQuestion` and refuses to substitute `Agent` — the substitution would structurally collapse Lead-exclusive git and every quality gate.
+
 ## Install
 
 ```

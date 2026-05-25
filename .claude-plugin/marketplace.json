@@ -62,9 +62,9 @@
     },
     {
       "name": "agent-teams",
-      "description": "Spawn a Lead + Implementer + Reviewer + Tester (+ optional dedicated Security Checker) team and drive multi-task work in Waves with built-in quality gates. The Lead is the only role allowed to execute destructive git operations, and only `git add` (per-path) and `git commit` (no amend) — every other destructive operation (reset / restore / push / rebase / merge / revert / cherry-pick / --amend / branch -D / clean / stash drop / worktree remove) is forbidden even for the Lead, eliminating shared-workspace race conditions by construction. All teammates are spawned in a single Phase 2 batch; the Tester is requested exactly once at the end of each wave (per-commit verification requests are forbidden). The skill is manually invoked via `/agent-teams <task description>` (automatic invocation is disabled). Includes spawn-prompt templates, a wave-composition template, a Lead checklist, and references for git permissions, Implementer pitfalls (literal control bytes), and Tester request consolidation.",
+      "description": "Orchestrate a multi-role agent team (Lead + Implementer + Reviewer + Tester, plus optional dedicated Security Checker) to deliver multiple tasks in Waves with built-in quality gates. Manually invoked via `/agent-teams <task description>` (automatic invocation disabled). Core invariants: Lead-exclusive `git add` (per-path) and `git commit` (no amend) — every other destructive git operation is forbidden even for the Lead, eliminating shared-workspace race conditions by construction. All teammates are spawned in a single Phase 2 batch; the Tester runs exactly one full regression at end-of-wave (per-commit verification is forbidden). Ships spawn-prompt templates (Implementer / Reviewer / Tester / Security Checker), a wave-composition template, a Lead checklist, and references for git permissions, Implementer pitfalls (literal control bytes), and Tester request consolidation.",
       "source": "./plugins/agent-teams",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
       "keywords": [
         "agent-teams",

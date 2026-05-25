@@ -71,7 +71,7 @@ Each task description must state "Owned files (exclusive)" and "Forbidden (owned
 
 ### Phase 2: Spawn (one batch)
 1. `TeamCreate` to make the team
-2. `TaskCreate` for 6 tasks; set `addBlockedBy` on tasks #5/#6 to encode the Wave structure
+2. `TaskCreate` for 6 tasks (subject / description / activeForm / metadata only). After creation, wire Wave dependencies via `TaskUpdate({ taskId, addBlockedBy: [<upstream-id>, …] })` on tasks #5/#6
 3. Copy templates from `assets/spawn-prompts/` and substitute placeholders
 4. Spawn Implementer×4 + Reviewer×1 + Tester×1 (+ Security Checker×1 if needed) **in a single message**, in parallel
    - Reviewer/Tester have "wait for SendMessage" baked into their templates

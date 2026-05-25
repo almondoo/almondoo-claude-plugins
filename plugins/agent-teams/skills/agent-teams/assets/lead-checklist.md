@@ -17,7 +17,7 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 
 - [ ] Create the team via `TeamCreate`
 - [ ] Register 6 tasks via `TaskCreate` (each description states owned files / forbidden files / acceptance criteria / commit-message draft)
-- [ ] Set `addBlockedBy` on Wave 2 tasks to encode dependencies
+- [ ] Wire Wave 2 dependencies via `TaskUpdate({ taskId, addBlockedBy: [<upstream-id>, …] })` after each task is created (`TaskCreate` itself takes only `subject` / `description` / `activeForm` / `metadata`, no `blocked_by` field)
 - [ ] Copy templates from `assets/spawn-prompts/` and substitute placeholders
 - [ ] **Spawn 6 teammates in a single message** (Implementer×4 + Reviewer + Tester)
   - Add a Security Checker if needed (large or security-critical)
@@ -28,7 +28,7 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 
 - [ ] Confirm the Implementer's request:
   - [ ] Owned file paths (per-path, no off-target contamination)
-  - [ ] vitest counts / typecheck / lint green
+  - [ ] unit-test counts / typecheck / lint green (per the project's `<TEST_RUNNER_COMMAND>` / `<TYPECHECK_COMMAND>` / `<LINT_COMMAND>`)
   - [ ] **literal control-byte check** reports `[]`
   - [ ] Proposed commit message follows the convention
 - [ ] Check the working tree with `git status`
@@ -53,9 +53,9 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 ## Wave completion (after all tasks completed + all Reviewer PASS)
 
 - [ ] **SendMessage the Tester to request the final full regression** (once only)
-  - [ ] `bun run test:unit` (full)
-  - [ ] `bun --filter '*' typecheck && bun run typecheck`
-  - [ ] `bun --filter '*' lint && bun run lint`
+  - [ ] `<FULL_TEST_COMMAND>` (e.g. `bun run test:unit`, `pnpm test`, `pytest`)
+  - [ ] `<TYPECHECK_COMMAND>` (e.g. `bun --filter '*' typecheck && bun run typecheck`, `tsc -b`, `mypy .`)
+  - [ ] `<LINT_COMMAND>` (e.g. `bun --filter '*' lint && bun run lint`, `eslint .`, `ruff check`)
   - [ ] `git log --stat` to confirm per-commit staging
 - [ ] On Tester PASS → proceed to disband
 - [ ] **If no response after 3× the Tester's expected time (~6 min vs ~1-2 min)**:
