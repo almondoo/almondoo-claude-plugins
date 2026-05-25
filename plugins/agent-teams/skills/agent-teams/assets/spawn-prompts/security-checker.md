@@ -61,9 +61,25 @@ Stay idle until the Lead sends a SendMessage saying "Please security-review comm
 - Recording to audit logs
 
 ### Cross-tenant leakage
-- Structural isolation via per-tenant keys (orgId / userId)
-- Tenant separation for cache / IndexedDB / Redis channel
-- SQL RLS / enforced `where: { orgId }` in Prisma middleware
+- Structural isolation via per-tenant keys (e.g. orgId / userId)
+- Tenant separation for caches and message channels (e.g. in-memory cache, IndexedDB, Redis channel)
+- DB-level isolation (e.g. SQL RLS, ORM middleware that forces `where: { tenantId }`)
+
+## CLAUDE.md / project-specific constraints
+
+<PROJECT_SPECIFIC_CLAUDEMD_CONSTRAINTS>
+Example (substitute the project's actual auth/ORM/security conventions):
+- Required auth guard chain on every API route (e.g. `requireAuth()` + `requireProjectAccess()`)
+- ORM / DB constraints (e.g. "no raw SQL string concatenation", "Prisma middleware enforces tenant scoping")
+- Approved crypto primitives only; banned algorithms / modes
+- Specific must-cite references when raising Critical (project OWASP map, audit-log spec, etc.)
+
+<PROJECT_SPECIFIC_SECURITY_PATTERNS>
+Example (security findings from past waves to recheck against the current commit):
+- Cross-tenant vector leakage in AI inference
+- Prompt budget exhaustion / safety-filter bypass via normalization
+- Audit hash-chain race during concurrent writes
+- Per-tenant DEK zero-fill on rotation
 
 ## Report format (SendMessage to Lead)
 
@@ -98,3 +114,5 @@ Ready. Wait for the first SendMessage from the Lead.
 | `<WAVE_NUMS>` | Wave numbers covered | `1+2` |
 | `<COMMITS_AHEAD>` | Current commits ahead | `<N>` |
 | `<CURRENT_HEAD>` | Current HEAD short hash | `abc1234` |
+| `<PROJECT_SPECIFIC_CLAUDEMD_CONSTRAINTS>` | Auth / ORM / crypto conventions from CLAUDE.md | "no raw SQL", "requireAuth() + requireProjectAccess()" |
+| `<PROJECT_SPECIFIC_SECURITY_PATTERNS>` | Past-wave security findings to recheck | Cross-tenant vector leakage, prompt budget exhaustion, etc. |

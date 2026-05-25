@@ -167,7 +167,7 @@ Implementers must not execute any destructive git operations. They only implemen
 
 1. Understand the user's request and grasp the overall scope
 2. Read the issue / spec / git log, then pick 6 target tasks from the backlog
-   - Prefer new helpers / high independence / no Prisma migration / no new dependencies
+   - Prefer new helpers / high independence / no DB schema migration / no new dependencies
    - Verify they don't overlap with existing commits (search for similar task names with `git log --grep`)
 3. **Decide the Wave structure** — typical is "4 in parallel + 2 blocked_by" (details: `assets/wave-template.md`):
    - Naming convention `W<n>-<D|A|AI|UI><id>` (D=doc / A=api / AI=ai / UI=ui)
@@ -200,6 +200,38 @@ Each template **must include** (already baked into the templates):
 - **Explicit git write permissions** (all destructive forbidden / non-destructive free) — details: `references/git-permissions.md`
 - **literal control-byte caveat** (Implementer only, details: `references/implementer-pitfalls.md`)
 
+#### Concrete Phase 2 sequence (pseudocode)
+
+```
+// 1. Create team
+TeamCreate({ team_name: "issue-123-wave-1", description: "issue #123 wave 1" })
+
+// 2. Register 6 tasks (TaskCreate takes only subject / description / activeForm / metadata)
+const t1 = TaskCreate({ subject: "[W1-D1] ...", description: "Owned files: ...", activeForm: "implementing ..." })
+const t2 = TaskCreate({ subject: "[W1-D2] ...", ... })
+const t3 = TaskCreate({ subject: "[W1-A1] ...", ... })
+const t4 = TaskCreate({ subject: "[W1-A2] ...", ... })
+const t5 = TaskCreate({ subject: "[W2-AI1] ...", ... })
+const t6 = TaskCreate({ subject: "[W2-UI1] ...", ... })
+
+// 3. Wire blocked_by AFTER creation (Wave 2 tasks blocked by all of Wave 1)
+TaskUpdate({ taskId: t5.id, addBlockedBy: [t1.id, t2.id, t3.id, t4.id] })
+TaskUpdate({ taskId: t6.id, addBlockedBy: [t1.id, t2.id, t3.id, t4.id] })
+
+// 4. Spawn ALL teammates in a SINGLE message (multiple parallel Agent tool calls)
+Agent({ team_name: "issue-123-wave-1", name: "impl-doc1",        subagent_type: "general-purpose", prompt: <filled implementer.md> })
+Agent({ team_name: "issue-123-wave-1", name: "impl-doc2",        subagent_type: "general-purpose", prompt: <filled implementer.md> })
+Agent({ team_name: "issue-123-wave-1", name: "impl-api1",        subagent_type: "general-purpose", prompt: <filled implementer.md> })
+Agent({ team_name: "issue-123-wave-1", name: "impl-api2",        subagent_type: "general-purpose", prompt: <filled implementer.md> })
+Agent({ team_name: "issue-123-wave-1", name: "reviewer-code",    subagent_type: "general-purpose", prompt: <filled reviewer.md>    })
+Agent({ team_name: "issue-123-wave-1", name: "tester-regression", subagent_type: "general-purpose", prompt: <filled tester.md>     })
+// + Agent({ ..., name: "security-checker", ..., prompt: <filled security-checker.md> }) when dedicated
+```
+
+##### Tightening teammate tool access via subagent definitions (optional)
+
+The `subagent_type` you pass above may reference a project-/plugin-/user-level subagent defined at `.claude/agents/<name>.md` (or under a plugin). When the definition has a `tools:` frontmatter allowlist, the spawned teammate honors it — so you can structurally restrict a Reviewer/Tester to read-only tools (no `Edit` / `Write`) rather than relying only on prompt wording. Coordination tools (`SendMessage`, `Task*`) remain available to teammates even when other tools are restricted. This plugin does not currently ship subagent definitions; defining them in your own project gives you a second defensive layer.
+
 ### Phase 3: Execution and quality gates (continuous SendMessage interaction)
 
 The Lead acts purely as an **orchestrator**. Never use the Edit tool on code (implementation belongs to Implementers). Only `git add` + `git commit` git operations are executed by the Lead on behalf of Implementers. When fixes are needed, always send a SendMessage to the Implementer.
@@ -212,14 +244,14 @@ The Lead acts purely as an **orchestrator**. Never use the Edit tool on code (im
    (Request contents: file paths, counts (unit-test pass + typecheck/lint green), acceptance criteria, control-byte check `[]`, proposed commit message)
 3. Lead checks scope with `git status` → runs `git add <per-path>` → `git commit -m "..."` on their behalf
 4. Lead → SendMessage to Implementer: "commit <hash> done" → Implementer marks TaskUpdate completed
-5. Lead → SendMessage to Reviewer: "Please review commit <hash>, files: ..."
-6. Reviewer reviews → reports back to Lead via SendMessage
-7. If there are Critical / Important findings:
+5. Lead → SendMessage to Reviewer (AND, if Security Checker is dedicated, to the Security Checker in parallel): "Please review commit <hash>, files: ..."
+6. Reviewer (and Security Checker, if dedicated) reviews → each reports back to Lead via SendMessage
+7. If there are Critical / Important / High findings (Reviewer uses Critical/Important/Minor, Security Checker uses Critical/High/Medium — treat **Critical/Important/High as must-fix**, Minor/Medium as follow-up):
    a. Lead → SendMessage to Implementer: "Please fix the following: ..."
    b. Implementer fixes → local verification → requests fix commit from Lead
    c. Lead runs the fix commit on their behalf (`fix(scope): #issue reviewer C-N ...`)
-   d. Lead → SendMessage to Reviewer: "Please verify the fix"
-   e. Reviewer re-checks → repeat until OK
+   d. Lead → SendMessage to Reviewer (and Security Checker, if they raised findings): "Please verify the fix"
+   e. Reviewers re-check → repeat until OK
 8. Tester is NOT called in this cycle (Implementer self-verification + Reviewer quality gate already establish commit-level quality)
 9. Task N done → Implementer moves on to the next task
 ```
@@ -228,12 +260,12 @@ The Lead acts purely as an **orchestrator**. Never use the Edit tool on code (im
 
 #### Fix-cycle guardrails
 
-The Reviewer ↔ Implementer fix loop in step 7 can spiral if the same class of Critical / Important keeps recurring. To stop runaway loops:
+The Reviewer/Security-Checker ↔ Implementer fix loop in step 7 can spiral if the same class of Critical / Important / High keeps recurring. To stop runaway loops:
 
-- **Cap per task: `MAX_FIX_ITERATIONS = 3`** (each iteration = one Implementer fix + Reviewer re-check)
+- **Cap per task: `MAX_FIX_ITERATIONS = 3`** (each iteration = one Implementer fix + reviewers' re-check, counted across Reviewer and Security Checker findings combined for the same task)
 - Lead tracks the iteration count per task locally (a small note table is enough; do **not** write it into the TaskCreate description because teammates also write there and race conditions clobber notes)
-- If iteration 3 still produces Critical / Important on the same task:
-  1. Lead halts the cycle and instructs the Reviewer to summarize the remaining findings
+- If iteration 3 still produces Critical / Important / High on the same task:
+  1. Lead halts the cycle and instructs the Reviewer (and Security Checker, if dedicated) to summarize the remaining findings
   2. Lead also asks the Implementer for a brief diagnosis of why the fixes haven't converged
   3. Lead escalates to the user via AskUserQuestion with these options:
      - `(1) Defer this task to a follow-up issue and continue the wave with what passes`
@@ -255,16 +287,34 @@ Reviewer: reviewing task 1
 * But never run tasks that touch the same file in parallel.
 ```
 
-#### Wave completion → disband
+#### Teammate unresponsiveness fallback (Implementer / Reviewer / Security Checker)
+
+If an **Implementer** stops responding mid-wave (no progress, no answer to SendMessage):
+
+- Send a status-check SendMessage. If still no reply after the expected response window, **spawn a replacement teammate** (`name: "impl-<area><N>-r"`, `r` = replacement) for the remaining owned tasks, hand off the in-progress task with explicit "what's done / what's left" context in the spawn prompt, then send `shutdown_request` to the original teammate.
+- Do not run the unresponsive Implementer's pending edits yourself (that collapses the quality gate). The replacement does them.
+
+**Reviewer** / **Security Checker** non-response is handled the same way (replacement spawn), but include an explicit "commits not yet reviewed: `<hash1>, <hash2>, …`" list in the replacement's spawn prompt so review context is reconstructed.
+
+**Tester** non-response uses the Lead direct-verification route instead (see `references/tester-optimization.md`) — Tester replacement is rarely useful because the regression is read-only.
+
+Public docs limitation: teammates sometimes fail to mark tasks as `completed`, which blocks downstream `addBlockedBy` tasks. If `TaskList` shows a task stuck in `in_progress` after the Implementer has clearly finished (commit landed + Reviewer PASS), the Lead may `TaskUpdate({ taskId, status: "completed" })` directly — citing the commit hash as evidence in a SendMessage to the Implementer ("marking <task> completed on your behalf — commit <hash> landed and reviewer PASS"). Treat this as a tracking correction, not a workflow shortcut.
+
+### Phase 4: Disband (Wave completion → TeamDelete)
 
 ```
-1. Lead confirms all tasks are completed and all Reviewer PASS
+1. Lead confirms all tasks are completed and all Reviewer (and Security Checker, if dedicated) PASS
 2. Lead → SendMessage to Tester to request the final full regression (once only)
-3. On Tester PASS, send shutdown_request to all teammates → TeamDelete
-4. Report a wave summary to the user
+3. On Tester PASS, send shutdown_request individually to each teammate; wait for shutdown_approved from each
+4. Once every teammate has shutdown_approved (or the team has confirmed teammate_terminated), call TeamDelete
+5. Report a wave summary to the user
 ```
 
-If the Tester takes longer than 3× its expected time (about 6 min for a typical ~1-2 min run) without responding, the Lead may run verification commands directly via Bash (Lead direct-verification route, details: `references/tester-optimization.md`). This is read-only objective verification and does not bypass the quality gate.
+Notes on Phase 4:
+- `shutdown_request` is a one-per-teammate SendMessage (not a broadcast). Example: `SendMessage({ to: "impl-doc1", message: { type: "shutdown_request", reason: "wave complete" } })`. Teammates respond with `shutdown_response` (`approve: true|false`); on approve they exit.
+- If a teammate `rejects` (e.g. they believe a task is unfinished), the Lead inspects the reason, confirms task status, and re-sends after resolving — do not force-cleanup a rejecting teammate.
+- **`TeamDelete` fails if any teammate is still active** (per Agent Teams runtime). Confirm all `teammate_terminated` notifications before calling. The detailed checklist (`assets/lead-checklist.md` "On disband") enumerates the per-teammate verification steps.
+- If the Tester takes longer than 3× its expected time (~6 min for a typical ~1-2 min run) without responding, the Lead may run verification commands directly via Bash (Lead direct-verification route, details: `references/tester-optimization.md`). This is read-only objective verification and does not bypass the quality gate.
 
 For a detailed checklist, see `assets/lead-checklist.md`.
 

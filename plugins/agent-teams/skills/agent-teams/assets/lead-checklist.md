@@ -6,7 +6,7 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 
 - [ ] Understand the user's request and grasp the overall scope
 - [ ] Read the issue / spec / git log and pick 6 target tasks from the backlog
-  - [ ] Prefer new helpers / high independence / no Prisma migration / no new dependencies
+  - [ ] Prefer new helpers / high independence / no DB schema migration / no new dependencies
   - [ ] Confirm no overlap with existing commits (search similar task names via `git log --grep`)
 - [ ] Decide the Wave structure (typical: 4 in parallel + 2 blocked_by)
 - [ ] Follow the naming convention `W<n>-<D|A|AI|UI><id>`
@@ -37,11 +37,11 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 - [ ] Re-check with `git status` to confirm staging contains exactly the 2 owned files
 - [ ] Run `git commit -m "..."` (no `--amend`, no push)
 - [ ] SendMessage the Implementer: "commit <hash> done, please TaskUpdate completed"
-- [ ] SendMessage the Reviewer to request a review
+- [ ] SendMessage the Reviewer to request a review (and, **if a dedicated Security Checker exists**, SendMessage them in parallel — both reviewers see the same commit at the same time)
 
-## When Reviewer results arrive
+## When Reviewer (and Security Checker) results arrive
 
-- [ ] If there are Critical / Important:
+- [ ] If there are Critical / Important (Reviewer) **or Critical / High (Security Checker)** findings:
   - [ ] SendMessage the Implementer with a fix request (cite specific file:line + fix proposal)
   - [ ] On Implementer fix completion → run the fix commit via the proxy procedure above
   - [ ] SendMessage the Reviewer for a re-review
@@ -76,10 +76,11 @@ What the Lead should verify at each phase of the wave. Consult at wave start / d
 
 ## On disband
 
-- [ ] Send **individual shutdown_request via SendMessage** to every teammate
-- [ ] Wait for shutdown_approved from each teammate
-- [ ] Confirm `teammate_terminated` notifications from system
-- [ ] All shut down (or even if some are unresponsive, `TeamDelete` force-cleans them)
+- [ ] Confirm `TaskList` shows every task `completed`. If any are stuck `in_progress` after the commit clearly landed + Reviewer PASS (known runtime limitation: teammates occasionally forget to mark `completed`), the Lead may `TaskUpdate({ taskId, status: "completed" })` directly — record the commit hash as evidence in a SendMessage to the Implementer
+- [ ] Send **individual shutdown_request via SendMessage** to every teammate (one call per teammate, not a broadcast). Example:
+      `SendMessage({ to: "impl-doc1", message: { type: "shutdown_request", reason: "wave complete" } })`
+- [ ] Wait for `shutdown_response` (`approve: true`) from each teammate. If any teammate **rejects** (e.g. claims unfinished work), inspect the reason, verify task state, resolve, then re-send — do not force-cleanup a rejecting teammate
+- [ ] Confirm `teammate_terminated` notifications from the system for **every** teammate before calling `TeamDelete` — `TeamDelete` fails when active teammates remain (Agent Teams runtime)
 - [ ] Run `TeamDelete`
 - [ ] Confirm final state with `git log main..HEAD --oneline | head` + `git status`
 - [ ] Report wave summary to the user:
