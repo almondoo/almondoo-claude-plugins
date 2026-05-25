@@ -1,0 +1,5 @@
+{
+  "name": "iterative-refine",
+  "version": "0.1.0",
+  "description": "Run iterative refinement loops (implement, verify, fix, then re-verify) within a single conversation. Provides explicit termination conditions — success (verification exits 0), max iterations (default 5), oscillation (same verification output two times in a row), and escape attempt (about to skip a test, weaken an assertion, rewrite the verification command, or apply a broad ignore) — to prevent the common failure modes of open-ended self-refinement: stopping at 'good enough', oscillating between two states, drifting to unrelated files, and verification cheating. Requires four inputs from the user: goal, verification command (whose exit code defines success), max iterations, and editable scope; the skill asks via AskUserQuestion when any are missing. Forbids in-loop test skips, snapshot rewrites, and broad lint or type ignores. Use for 'fix until tests pass' or 'resolve every type or lint error' style tasks where the exit criterion is objective. NOT for cross-session work — use /loop (ScheduleWakeup-based) when the loop must survive across sessions."
+}
