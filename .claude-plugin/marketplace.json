@@ -13,7 +13,7 @@
       "name": "configure-github-permissions",
       "description": "Interactively configure GitHub CLI (gh, including gh api) AND git command permissions in the project-local .claude/settings.local.json via 17 categories × 3 choices (allow / ask / deny). Destructive categories (gh merge / release / workflow exec / gh api / delete-class; git push / reset --hard / restore / branch -D / clean -fd / stash drop) default to deny. git uses broad-allow + narrow-deny to keep safe sub-uses friction-free while blocking destructive ones via the deny→ask→allow first-match-wins rule.",
       "source": "./plugins/configure-github-permissions",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "category": "productivity",
       "keywords": [
         "gh",
@@ -29,7 +29,7 @@
       "name": "parallel-audit",
       "description": "Multi-agent parallel audit of CLAUDE.md, CLAUDE.local.md, AGENTS.md, GEMINI.md, or SKILL.md files for cross-section contradictions, missing qualifiers, terminology drift, and unstated premises. Use this skill whenever the user asks to audit, review, verify, quality-check, or convergence-check one of these files — even without the word \"audit\" — or mentions a recent refactor, a rule being ignored, observed behavior drift, a pre-shipping check before publishing a plugin, or accumulated session learnings. Dispatches N independent subagents (default 3), keeps only findings flagged by ≥threshold (default 2), classifies redundancy, then proposes targeted fixes with per-fix user approval. Do NOT use for writing a new instruction file (use skill-creator), updating with session learnings (use revise-claude-md), or auditing source code or non-markdown configs.",
       "source": "./plugins/parallel-audit",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "category": "productivity",
       "keywords": [
         "audit",
@@ -48,7 +48,7 @@
       "name": "reviewing-dependency-updates",
       "description": "Security-first review checklist for dependency update PRs from Dependabot, Renovate, or manual bumps. Walks a three-phase decision flow — Phase 1 basic verification (CI matrix, mergeability, version-jump class), Phase 2 security verification (GitHub Security Advisory, package trust signals, transitive-dependency churn, SHA pinning for Actions), Phase 3 change-impact (breaking changes, language-version requirements vs. CI matrix, lockfile consistency) — then classifies each PR as merge / caution / do-not-merge and proposes a recommended action. Never auto-executes the merge; always requires explicit user approval.",
       "source": "./plugins/reviewing-dependency-updates",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
       "keywords": [
         "dependency-updates",
@@ -64,7 +64,7 @@
       "name": "agent-teams",
       "description": "Orchestrate a multi-role agent team (Lead + Implementer + Reviewer + Tester, plus optional dedicated Security Checker) to deliver multiple tasks in Waves with built-in quality gates. Manually invoked via `/agent-teams <task description>` (automatic invocation disabled). Core invariants: Lead-exclusive `git add` (per-path) and `git commit` (no amend) — every other destructive git operation is forbidden even for the Lead, eliminating shared-workspace race conditions by construction. All teammates are spawned in a single Phase 2 batch; the Tester runs exactly one full regression at end-of-wave (per-commit verification is forbidden). Ships spawn-prompt templates (Implementer / Reviewer / Tester / Security Checker), a wave-composition template, a Lead checklist, and references for git permissions, Implementer pitfalls (literal control bytes), and Tester request consolidation.",
       "source": "./plugins/agent-teams",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "category": "productivity",
       "keywords": [
         "agent-teams",
@@ -83,7 +83,7 @@
       "name": "iterative-refine",
       "description": "Run iterative refinement loops (implement, verify, fix, then re-verify) within a single conversation. Provides explicit termination conditions — success (verification exits 0), max iterations (default 5), oscillation (same verification output two times in a row), and escape attempt (about to skip a test, weaken an assertion, rewrite the verification command, or apply a broad ignore) — to prevent the common failure modes of open-ended self-refinement: stopping at 'good enough', oscillating between two states, drifting to unrelated files, and verification cheating. Requires four inputs from the user: goal, verification command (whose exit code defines success), max iterations, and editable scope; the skill asks via AskUserQuestion when any are missing. Forbids in-loop test skips, snapshot rewrites, and broad lint or type ignores. Use for 'fix until tests pass' or 'resolve every type or lint error' style tasks where the exit criterion is objective. NOT for cross-session work — use /loop (ScheduleWakeup-based) when the loop must survive across sessions.",
       "source": "./plugins/iterative-refine",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
       "keywords": [
         "iterative-refine",

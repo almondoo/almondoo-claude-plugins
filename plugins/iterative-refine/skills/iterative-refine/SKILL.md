@@ -1,6 +1,7 @@
 ---
 name: iterative-refine
 description: Use when running iterative refinement loops (implement → verify → fix → re-verify) inside the current conversation - establishes explicit exit conditions (success, max iterations, oscillation, escape attempts) and forbids in-loop verification cheating (test skips, assertion weakening, broad ignore comments). Prevents premature termination at "good enough", scope drift to unrelated files, and silent goalpost shifts. Not for cross-session loops - use /loop (ScheduleWakeup-based) for that.
+disable-model-invocation: true
 ---
 
 # iterative-refine

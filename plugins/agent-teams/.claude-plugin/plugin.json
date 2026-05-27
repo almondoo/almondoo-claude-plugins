@@ -1,7 +1,7 @@
 {
   "name": "agent-teams",
   "description": "Orchestrate a multi-role agent team (Lead + Implementer + Reviewer + Tester, plus optional dedicated Security Checker) to deliver multiple tasks in Waves with built-in quality gates. Manually invoked via `/agent-teams <task description>` (automatic invocation disabled). Core invariants: Lead-exclusive `git add` (per-path) and `git commit` (no amend) — every other destructive git operation is forbidden even for the Lead, eliminating shared-workspace race conditions by construction. All teammates are spawned in a single Phase 2 batch; the Tester runs exactly one full regression at end-of-wave (per-commit verification is forbidden). Ships spawn-prompt templates (Implementer / Reviewer / Tester / Security Checker), a wave-composition template, a Lead checklist, and references for git permissions, Implementer pitfalls (literal control bytes), and Tester request consolidation.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": {
     "name": "almondoo"
   },

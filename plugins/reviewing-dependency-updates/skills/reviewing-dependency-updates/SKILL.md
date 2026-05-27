@@ -1,6 +1,7 @@
 ---
 name: reviewing-dependency-updates
 description: Use when reviewing dependency update PRs from Dependabot, Renovate, or manual bumps — before approving or merging any dependency-bump PR. Walks the user through a security-first three-phase checklist (basic CI / mergeability, supply-chain trust, breaking-change and runtime-compatibility impact) instead of merging on green CI alone. Trigger when the user says "review dependabot PRs", "check this renovate PR", "should I merge this bump", or whenever `gh pr list` surfaces a dependency update PR. Classifies each PR as merge / hold / block and proposes a recommended action — never auto-executes the merge.
+disable-model-invocation: true
 ---
 
 # Reviewing Dependency Updates

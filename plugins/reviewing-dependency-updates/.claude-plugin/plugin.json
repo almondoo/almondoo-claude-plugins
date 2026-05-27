@@ -1,7 +1,7 @@
 {
   "name": "reviewing-dependency-updates",
   "description": "Security-first review checklist for dependency update PRs from Dependabot, Renovate, or manual bumps. Walks a three-phase decision flow — Phase 1 basic verification (CI matrix, mergeability, version-jump class), Phase 2 security verification (GitHub Security Advisory, package trust signals, transitive-dependency churn, SHA pinning for Actions), Phase 3 change-impact (breaking changes, language-version requirements vs. CI matrix, lockfile consistency) — then classifies each PR as merge / caution / do-not-merge and proposes a recommended action. Never auto-executes the merge; always requires explicit user approval.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "almondoo"
   },
